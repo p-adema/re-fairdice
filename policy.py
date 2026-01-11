@@ -35,6 +35,10 @@ class MLP(nnx.Module):
     
     def __call__(self, x):
         return self.layer(x)
+
+import tensorflow_probability.substrates.jax as tfp
+tfd = tfp.distributions
+tfb = tfp.bijectors
     
 class DiscretePolicy(nnx.Module):
     def __init__(self,
@@ -51,12 +55,9 @@ class DiscretePolicy(nnx.Module):
         x = self.mlp_layer(inputs)
         
         logits = self.layer(x)
-        probs = nnx.softmax(logits, axis=-1)
-        return logits, probs
+        # probs = nnx.softmax(logits, axis=-1)
+        return tfd.Categorical(logits=logits)  # to match interface of GaussianPolicy
 
-import tensorflow_probability.substrates.jax as tfp
-tfd = tfp.distributions
-tfb = tfp.bijectors
 
 LOG_STD_MIN = -5.0
 LOG_STD_MAX = 2.0

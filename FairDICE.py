@@ -2,7 +2,7 @@ from collections import namedtuple
 import jax
 import jax.numpy as jnp
 from flax import nnx
-from policy import GaussianPolicy, MuNetwork
+from policy import GaussianPolicy, MuNetwork, DiscretePolicy
 from critic import Critic
 from divergence import f, FDivergence, f_derivative_inverse
 import orbax.checkpoint as orbax
@@ -24,16 +24,29 @@ import optax
 def init_train_state(config) -> TrainState:
     rngs = nnx.Rngs(config.seed)
 
-    policy = GaussianPolicy(
-        input_dim=config.state_dim,
-        hidden_dims=config.hidden_dims,
-        action_dim=config.action_dim,
-        activation=nnx.relu,
-        temperature=config.temperature,
-        tanh_squash_distribution=config.tanh_squash_distribution,
-        rngs=rngs,
-        layer_norm=config.layer_norm
-    )
+    if config.env_name == "MO-Four-Rooms" or config.env_name == "MO-MDP":
+        assert len(config.hidden_dim) == 1, "Hidden dimension must be a single value for discrete policy"
+        assert config.action_dim == 4, "Action dimension must be 4 for MO-Four-Rooms environment"
+
+        policy = DiscretePolicy(
+            input_dim=config.state_dim,
+            hidden_dim=config.hidden_dim[0],
+            action_dim=config.action_dim,
+            rngs=rngs
+        )
+
+    else:
+        policy = GaussianPolicy(
+            input_dim=config.state_dim,
+            hidden_dims=config.hidden_dims,
+            action_dim=config.action_dim,
+            activation=nnx.relu,
+            temperature=config.temperature,
+            tanh_squash_distribution=config.tanh_squash_distribution,
+            rngs=rngs,
+            layer_norm=config.layer_norm
+        )
+    
     
     policy_tx = optax.chain(
             optax.scale_by_adam(),

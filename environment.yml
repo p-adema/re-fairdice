@@ -6,7 +6,6 @@ dependencies:
   - python=3.9
   - pip=24.0
   - gym=0.21.0
-  - patchelf
   - pip:
     - setuptools==65.5.0
     - wheel==0.37.1
