@@ -112,7 +112,10 @@ def main():
     )
     parser.add_argument("--log_interval", type=int, default=10_000, help="Log interval")
     parser.add_argument(
-        "--eval_episodes", type=int, default=10, help="Evaluation episodes"
+        "--eval_episodes", type=int, default=50, help="Final evaluation episodes"
+    )
+    parser.add_argument(
+        "--interm_episodes", type=int, default=10, help="Intermediate eval episodes"
     )
     parser.add_argument(
         "--wandb", type=bool, default=False, help="Use wandb for logging"
@@ -127,17 +130,18 @@ def main():
 
     args = parser.parse_args()
     config = SimpleNamespace(**vars(args))
-    env = gymnasium.make(config.env_name)
+    env = gymnasium.make_vec(config.env_name, config.interm_episodes)
     example_obs, _ = env.reset()
 
     config.HIDDEN_DIMS = [config.hidden_dim] * config.num_layers
-    config.STATE_DIM = env.observation_space.shape[0]
-    config.ACTION_DIM = env.action_space.shape[0]
+    config.STATE_DIM = env.single_observation_space.shape[0]
+    config.ACTION_DIM = env.single_action_space.shape[0]
     config.REWARD_DIM = objective_counts[config.env_name]
     config.STATE_MEAN = state_norm_params[config.env_name]["mean"]
     config.STATE_STD = np.sqrt(state_norm_params[config.env_name]["var"])
-    config.ACTION_BIAS = (env.action_space.high + env.action_space.low) / 2.0
-    config.ACTION_SCALE = (env.action_space.high - env.action_space.low) / 2.0
+    act_high, act_low = env.single_action_space.high, env.single_action_space.low
+    config.ACTION_BIAS = (act_high + act_low) / 2.0
+    config.ACTION_SCALE = (act_high - act_low) / 2.0
 
     buffer = Buffer(
         args.data_dir,
@@ -151,19 +155,19 @@ def main():
         (config.ACTION_BIAS, config.ACTION_SCALE),
     )
 
-    print(
-        f"Loaded: {len(buffer) // config.batch_size} batches of {config.batch_size}"
-        f", training for {config.total_train_steps / len(buffer):.2f} full passes"
-    )
+    print(f"Loaded: {len(buffer) // config.batch_size} batches of {config.batch_size}")
     print("Compiling...")
 
     model_cls = {"FairDICE": FairDICE}[config.learner]
 
     model = model_cls(config)
-    model.to("cuda" if torch.cuda.is_available() else "cpu").train()
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.to(device).train()
     torch.autograd.set_detect_anomaly(True)
 
     model.step(buffer.sample(config.batch_size))
+    with torch.no_grad():
+        model(torch.asarray(example_obs, device=device, dtype=torch.float32))
 
     time_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_name = (
@@ -191,7 +195,6 @@ def main():
                 policy=model,
                 env=env,
                 save_dir=out_dir / "logs",
-                num_episodes=config.eval_episodes,
                 max_steps=config.max_seq_len,
                 t_env=it,
                 env_seed=config.seed,
@@ -207,9 +210,8 @@ def main():
     steps, nash, utilitarian = evaluate_policy(
         config=config,
         policy=model,
-        env=env,
+        env=gymnasium.make_vec(config.env_name, config.eval_episodes),
         save_dir=out_dir / "eval",
-        num_episodes=config.eval_episodes,
         max_steps=config.max_seq_len,
         t_env=config.total_train_steps,
         env_seed=config.seed,

@@ -11,9 +11,8 @@ from torch import nn
 def evaluate_policy(
     config: SimpleNamespace,
     policy: nn.Module,
-    env: gymnasium.Env,
+    env: gymnasium.vector.VectorEnv,
     save_dir: str | Path,
-    num_episodes: int = 10,
     max_steps: int = 500,
     t_env: int = -1,
     env_seed: int = 42,
@@ -22,50 +21,43 @@ def evaluate_policy(
     device = "cuda" if torch.cuda.is_available() else "cpu"
     policy.to(device)
 
-    steps_list = []
-    raw_returns = []
-    normalized_returns = []
-    rew_min = config.REWARD_MIN.numpy(force=True)
-    rew_max = config.REWARD_MAX.numpy(force=True)
+    dones = np.empty((env.num_envs, max_steps), dtype=np.bool)
+    rew_min = config.REWARD_MIN.numpy(force=True).reshape(-1)
+    rew_max = config.REWARD_MAX.numpy(force=True).reshape(-1)
 
-    for seed in np.random.SeedSequence(entropy=env_seed).generate_state(num_episodes):
-        state, _ = env.reset(seed=seed.item())
-        done = False
-        steps = 0
-        raw_rewards_list = []
-        normalized_rewards_list = []
+    state, _ = env.reset(seed=env_seed)
+    raw_rewards = np.full((env.num_envs, max_steps, len(rew_max)), np.nan)
 
-        while not done and steps < max_steps:
-            # print(f"{state.shape=}, {config.STATE_MEAN=} {config.STATE_STD=}")
-            s_t = (state - config.STATE_MEAN) / config.STATE_STD
-            action_dist = policy(torch.asarray(s_t, device=device, dtype=torch.float32))
-            action = (
-                action_dist.mean.view(-1).numpy(force=True) * config.ACTION_SCALE
-                + config.ACTION_BIAS
-            )
-            state, _, term, trunc, info = env.step(action)
-            done = term or trunc
+    for step in range(max_steps):
+        # print(f"{state.shape=}, {config.STATE_MEAN=} {config.STATE_STD=}")
+        s_t = (state - config.STATE_MEAN) / config.STATE_STD
+        action_dist = policy(torch.asarray(s_t, device=device, dtype=torch.float32))
+        action = (
+            action_dist.mean.numpy(force=True) * config.ACTION_SCALE
+            + config.ACTION_BIAS
+        )
+        state, _, term, trunc, info = env.step(action)
+        dones[:, step] = term | trunc
+        raw_rewards[:, step] = info["obj"]
 
-            raw_rewards = info["obj"]
-            raw_rewards_list.append(raw_rewards)
-            normalized_rewards = (raw_rewards - rew_min) / (rew_max - rew_min)
-            normalized_rewards_list.append(normalized_rewards)
+    steps = dones.argmax(1)
+    valid = np.arange(max_steps).reshape(1, -1) <= steps.reshape(-1, 1)
+    raw_rewards[~valid] = 0
+    raw_returns = raw_rewards.sum(1)
 
-            steps += 1
+    normalized_rewards = (raw_rewards - rew_min) / (rew_max - rew_min)
+    normalized_rewards[~valid] = 0
+    normalized_returns = normalized_rewards.sum(1)
 
-        steps_list.append(steps)
-        raw_returns.append(np.sum(raw_rewards_list, axis=0))
-        normalized_returns.append(np.sum(normalized_rewards_list, axis=0))
-
-    avg_steps = np.mean(steps_list).item()
+    avg_steps = steps.mean().item()
     avg_normalized_nsw_score = np.log(normalized_returns).sum(1).mean().item()
-    avg_normalized_usw_score = np.sum(normalized_returns, axis=1).mean()
+    avg_normalized_usw_score = np.sum(normalized_returns, axis=1).mean().item()
 
     save_dir = Path(save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
 
     np.save(save_dir / f"raw_returns_step_{t_env}.npy", raw_returns)
     np.save(save_dir / f"normalized_returns_step_{t_env}.npy", normalized_returns)
-    np.save(save_dir / f"steps_step_{t_env}.npy", steps_list)
+    np.save(save_dir / f"steps_step_{t_env}.npy", steps)
 
     return avg_steps, avg_normalized_nsw_score, avg_normalized_usw_score
