@@ -1,5 +1,7 @@
 from gymnasium import register as _register
 
+from .constants import objective_counts, state_norm_params
+
 _register(
     id="MO-Ant-v2",
     entry_point="environments.ant:AntEnv",
@@ -36,4 +38,4 @@ _register(
     max_episode_steps=500,
 )
 
-__all__ = []
+__all__ = ["objective_counts", "state_norm_params"]

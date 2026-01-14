@@ -1,6 +1,15 @@
 import numpy as np
 
-# These are the fixed norms as given by the FairDICE implementation.
+objective_counts = {
+    "MO-Hopper-v2": 2,
+    "MO-Hopper-v3": 3,
+    "MO-Ant-v2": 2,
+    "MO-HalfCheetah-v2": 2,
+    "MO-Swimmer-v2": 2,
+    "MO-Walker2d-v2": 2,
+}
+
+# These are the fixed norms as given by the D4RL dataset/paper
 # They do not match the emprical mean/std of the action distributions, though.
 state_norm_params = {
     "MO-Hopper-v2": {

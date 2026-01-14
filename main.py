@@ -1,26 +1,36 @@
 import argparse
-import os
-import pickle
-import random
-from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 from types import SimpleNamespace
 
+import gymnasium
 import numpy as np
+import torch.cuda
 import tqdm
+from dataset import Buffer
+from environments import objective_counts, state_norm_params
+from evaluation import evaluate_policy
+from fairdice import FairDICE
 
 
 def main():
+    start_time = datetime.now()
     parser = argparse.ArgumentParser()
-    parser.add_argument("--learner", type=str, default="limodice", help="Learner type")
-    parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate")
+    parser.add_argument(
+        "--learner",
+        type=str,
+        choices=["FairDICE"],
+        default="FairDICE",
+        help="Learner type",
+    )
     parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor")
-    parser.add_argument("--beta", type=float, default=0.001, help="beta hyperparameter")
+    parser.add_argument("--beta", type=float, default=1.0, help="beta hyperparameter")
     parser.add_argument(
         "--divergence",
         type=str,
+        choices=["KL", "CHI", "SOFT_CHI", "DUAL_DICE"],
         default="SOFT_CHI",
-        help="Divergence type (SOFT_CHI/CHI/KL)",
+        help="Divergence type",
     )
     parser.add_argument(
         "--gradient_penalty_coeff",
@@ -35,10 +45,10 @@ def main():
         help="Use tanh-squash distribution for actions if set",
     )
     parser.add_argument(
-        "--hidden_dim", type=int, default=256, help="Hidden dimension size"
+        "--hidden_dim", type=int, default=768, help="Hidden dimension size"
     )
     parser.add_argument(
-        "--num_layers", type=int, default=2, help="Number of layers in the network"
+        "--num_layers", type=int, default=3, help="Number of layers in the network"
     )
     parser.add_argument(
         "--temperature", type=float, default=1.0, help="Temperature for the policy"
@@ -47,12 +57,15 @@ def main():
         "--layer_norm", type=bool, default=True, help="Use layer normalization if set"
     )
     parser.add_argument("--nu_lr", type=float, default=3e-4, help="Nu learning rate")
+    parser.add_argument("--mu_lr", type=float, default=3e-4, help="Mu learning rate")
     parser.add_argument(
         "--policy_lr", type=float, default=3e-4, help="Policy learning rate"
     )
-    parser.add_argument("--mu_lr", type=float, default=3e-4, help="Mu learning rate")
     parser.add_argument(
         "--batch_size", type=int, default=256, help="Batch size for training"
+    )
+    parser.add_argument(
+        "--data_dir", type=str, default="./data", help="Dataset base directory"
     )
     parser.add_argument(
         "--quality",
@@ -77,29 +90,27 @@ def main():
     parser.add_argument(
         "--normalize_reward",
         type=bool,
-        default=False,
+        default=True,
         help="Whether to normalize reward",
     )
     parser.add_argument(
-        "--env_name", type=str, default="MO-Hopper-v2", help="Environment name"
-    )
-    parser.add_argument(
-        "--mode",
+        "--env_name",
         type=str,
-        default="train",
-        choices=["train", "eval"],
-        help="Running mode: 'train' or 'eval'",
-    )
-    parser.add_argument(
-        "--load_path",
-        type=str,
-        default=None,
-        help="Path to a saved model checkpoint (for eval mode).",
+        choices=[
+            "MO-Hopper-v2",
+            "MO-Hopper-v3",
+            "MO-Ant-v2",
+            "MO-HalfCheetah-v2",
+            "MO-Swimmer-v2",
+            "MO-Walker2d-v2",
+        ],
+        default="MO-Hopper-v2",
+        help="Environment name",
     )
     parser.add_argument(
         "--total_train_steps", type=int, default=100_000, help="Total training steps"
     )
-    parser.add_argument("--log_interval", type=int, default=1000, help="Log interval")
+    parser.add_argument("--log_interval", type=int, default=10_000, help="Log interval")
     parser.add_argument(
         "--eval_episodes", type=int, default=10, help="Evaluation episodes"
     )
@@ -110,78 +121,106 @@ def main():
         "--save_path",
         type=str,
         default="./results",
-        help="Path to save the model checkpoint",
+        help="Path to save results and the model checkpoint",
     )
     parser.add_argument("--seed", type=int, default=0, help="Random seed")
-    parser.add_argument("--tag", type=str, default="", help="Tag for the experiment")
 
     args = parser.parse_args()
     config = SimpleNamespace(**vars(args))
-    data_path = f"./data/{config.env_name}/{config.env_name}_50000_{config.quality}_{config.preference_dist}.pkl"
-    with open(data_path, "rb") as f:
-        trajs = pickle.load(f)
-        print("Loaded trajectories from", data_path)
+    env = gymnasium.make(config.env_name)
+    example_obs, _ = env.reset()
 
-    env = gym.make(config.env_name)
-    config.state_dim = env.observation_space.shape[0]
-    config.action_dim = env.action_space.shape[0]
-    config.reward_dim = env.obj_dim
-    config.state_mean = state_norm_params[config.env_name]["mean"]
-    config.state_std = np.sqrt(state_norm_params[config.env_name]["var"])
-    config.ACTION_HIGH = env.action_space.high
-    config.ACTION_LOW = env.action_space.low
-    config.ACTION_SCALE = (config.ACTION_HIGH - config.ACTION_LOW) / 2.0
-    config.ACTION_BIAS = (config.ACTION_HIGH + config.ACTION_LOW) / 2.0
+    config.HIDDEN_DIMS = [config.hidden_dim] * config.num_layers
+    config.STATE_DIM = env.observation_space.shape[0]
+    config.ACTION_DIM = env.action_space.shape[0]
+    config.REWARD_DIM = objective_counts[config.env_name]
+    config.STATE_MEAN = state_norm_params[config.env_name]["mean"]
+    config.STATE_STD = np.sqrt(state_norm_params[config.env_name]["var"])
+    config.ACTION_BIAS = (env.action_space.high + env.action_space.low) / 2.0
+    config.ACTION_SCALE = (env.action_space.high - env.action_space.low) / 2.0
 
-    reward_min, reward_max = None, None
-    for traj in trajs:
-        r = traj["raw_rewards"]
+    buffer = Buffer(
+        args.data_dir,
+        args.env_name,
+        args.quality,
+        args.preference_dist,
+    )
+    print("Initialising...")
+    config.REWARD_MIN, config.REWARD_MAX = buffer.normalise(
+        args.normalize_reward,
+        (config.STATE_MEAN, config.STATE_STD),
+        (config.ACTION_BIAS, config.ACTION_SCALE),
+    )
 
-        r_min = r.min(axis=0)
-        r_max = r.max(axis=0)
+    model_cls = {"FairDICE": FairDICE}[config.learner]
 
-        if reward_min is None:
-            reward_min, reward_max = r_min, r_max
-        else:
-            reward_min = np.minimum(reward_min, r_min)
-            reward_max = np.maximum(reward_max, r_max)
-    config.reward_min = reward_min
-    config.reward_max = reward_max
+    time_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_name = (
+        f"{time_stamp}_{config.learner}_{config.env_name}_{config.quality}_"
+        f"{config.preference_dist}_{config.divergence}_beta{config.beta}_seed{config.seed}"
+    )
+    out_dir = Path(config.save_path, run_name)
+    print("Saving to", out_dir)
+    (out_dir / "logs").mkdir(parents=True)
+    csv = (out_dir / "logs" / "stats.csv").open("w")
+    csv.write("iteration,steps,nash,utilitarian\n")
 
-    for traj in trajs:
-        if config.normalize_reward:
-            traj["rewards"] = min_max_normalization(
-                traj["raw_rewards"], reward_min, reward_max
+
+    model = model_cls(config)
+    model.to("cuda" if torch.cuda.is_available() else "cpu").train()
+    torch.autograd.set_detect_anomaly(True)
+
+    print("Compiling...")
+    model.step(buffer.sample(config.batch_size))
+
+    bar = tqdm.tqdm(
+        iterable=range(1, config.total_train_steps),
+        desc="Training",
+        unit="batches",
+        smoothing=0,
+        initial=1,
+        total=config.total_train_steps,
+    )
+    for it in bar:
+        if config.log_interval and it % config.log_interval == 0:
+            steps, nash, utilitarian = evaluate_policy(
+                config=config,
+                policy=model,
+                env=env,
+                save_dir=out_dir / "logs",
+                num_episodes=config.eval_episodes,
+                max_steps=config.max_seq_len,
+                t_env=it,
+                env_seed=config.seed,
             )
-        else:
-            traj["rewards"] = traj["raw_rewards"]
-        traj["states"] = normalization(
-            traj["observations"], config.state_mean, config.state_std
-        )
-        traj["next_states"] = normalization(
-            traj["next_observations"], config.state_mean, config.state_std
-        )
-        traj["actions"] = (traj["actions"] - config.ACTION_BIAS) / config.ACTION_SCALE
-        traj["init_observations"] = np.tile(
-            traj["observations"][0], (traj["observations"].shape[0], 1)
-        )
-        traj["init_states"] = np.tile(traj["states"][0], (traj["states"].shape[0], 1))
+            model.train()
+            csv.write(f"{it},{steps},{nash},{utilitarian}\n")
+            csv.flush()
+            bar.set_postfix_str(f"nsw={nash:.2f}, usw={utilitarian:.2f}")
 
-    tmp = defaultdict(list)
+        batch = buffer.sample(config.batch_size)
+        model.step(batch)
 
-    for traj in trajs:
-        for key, value in traj.items():
-            tmp[key].append(value)
 
-    batch = defaultdict(list)
 
-    for key, values in tmp.items():
-        batch[key] = np.concatenate(values, axis=0)
+    steps, nash, utilitarian = evaluate_policy(
+        config=config,
+        policy=model,
+        env=env,
+        save_dir=out_dir / "eval",
+        num_episodes=config.eval_episodes,
+        max_steps=config.max_seq_len,
+        t_env=config.total_train_steps,
+        env_seed=config.seed,
+    )
+    csv.write(f"{config.total_train_steps},{steps},{nash},{utilitarian}\n")
+    csv.close()
+    model.save(out_dir / "model.pt")
+    end_time = datetime.now()
+    print(f"Run complete: took {end_time - start_time}")
+    if torch.cuda.is_available():
+        print(f"Max CUDA VRAM use: {torch.cuda.max_memory_allocated() / 1e9:.1f} GB")
 
-    for key, value in batch.items():
-        print(key, value.shape)
 
-    config.hidden_dims = [config.hidden_dim] * config.num_layers
-
-    time_stamp = datetime.today().strftime("%Y%m%d_%H%M%S")
-    run_name = f"{time_stamp}_{config.learner}_{config.env_name}_{config.quality}_{config.preference_dist}_{config.divergence}_beta{config.beta}_seed{config.seed}"
+if __name__ == "__main__":
+    main()
