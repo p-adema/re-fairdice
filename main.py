@@ -145,14 +145,25 @@ def main():
         args.quality,
         args.preference_dist,
     )
-    print("Initialising...")
     config.REWARD_MIN, config.REWARD_MAX = buffer.normalise(
         args.normalize_reward,
         (config.STATE_MEAN, config.STATE_STD),
         (config.ACTION_BIAS, config.ACTION_SCALE),
     )
 
+    print(
+        f"Loaded: {len(buffer) // config.batch_size} batches of {config.batch_size}"
+        f", training for {config.total_train_steps / len(buffer):.2f} full passes"
+    )
+    print("Compiling...")
+
     model_cls = {"FairDICE": FairDICE}[config.learner]
+
+    model = model_cls(config)
+    model.to("cuda" if torch.cuda.is_available() else "cpu").train()
+    torch.autograd.set_detect_anomaly(True)
+
+    model.step(buffer.sample(config.batch_size))
 
     time_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_name = (
@@ -164,15 +175,6 @@ def main():
     (out_dir / "logs").mkdir(parents=True)
     csv = (out_dir / "logs" / "stats.csv").open("w")
     csv.write("iteration,steps,nash,utilitarian\n")
-
-
-    model = model_cls(config)
-    model.to("cuda" if torch.cuda.is_available() else "cpu").train()
-    torch.autograd.set_detect_anomaly(True)
-
-    print("Compiling...")
-    model.step(buffer.sample(config.batch_size))
-
     bar = tqdm.tqdm(
         iterable=range(1, config.total_train_steps),
         desc="Training",
@@ -181,6 +183,7 @@ def main():
         initial=1,
         total=config.total_train_steps,
     )
+
     for it in bar:
         if config.log_interval and it % config.log_interval == 0:
             steps, nash, utilitarian = evaluate_policy(
@@ -200,8 +203,6 @@ def main():
 
         batch = buffer.sample(config.batch_size)
         model.step(batch)
-
-
 
     steps, nash, utilitarian = evaluate_policy(
         config=config,

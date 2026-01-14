@@ -114,6 +114,9 @@ class Buffer:
     def __repr__(self):
         return f"Buffer(states={self.states}, ...)"
 
+    def __len__(self):
+        return len(self.states)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
