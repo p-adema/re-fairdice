@@ -21,12 +21,13 @@ def evaluate_policy(
     device = "cuda" if torch.cuda.is_available() else "cpu"
     policy.to(device)
 
-    dones = np.empty((env.num_envs, max_steps), dtype=np.bool)
+    dones = np.zeros((env.num_envs, max_steps), dtype=np.bool)
     rew_min = config.REWARD_MIN.numpy(force=True).reshape(-1)
     rew_max = config.REWARD_MAX.numpy(force=True).reshape(-1)
 
     state, _ = env.reset(seed=env_seed)
     raw_rewards = np.full((env.num_envs, max_steps, len(rew_max)), np.nan)
+    has_completed = np.zeros(env.num_envs, dtype=np.bool)
 
     for step in range(max_steps):
         # print(f"{state.shape=}, {config.STATE_MEAN=} {config.STATE_STD=}")
@@ -36,9 +37,12 @@ def evaluate_policy(
             action_dist.mean.numpy(force=True) * config.ACTION_SCALE
             + config.ACTION_BIAS
         )
-        state, _, term, trunc, info = env.step(action)
+        state, _rew, term, trunc, info = env.step(action)
         dones[:, step] = term | trunc
+        has_completed |= term | trunc
         raw_rewards[:, step] = info["obj"]
+        if has_completed.all():
+            break
 
     steps = dones.argmax(1)
     valid = np.arange(max_steps).reshape(1, -1) <= steps.reshape(-1, 1)
