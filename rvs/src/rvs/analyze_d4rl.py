@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import Dict, Iterable, List, Optional, Union
 
 import configargparse
-from d4rl import offline_env
-from d4rl.kitchen import kitchen_envs
-from d4rl.locomotion import ant
+# from d4rl import offline_env
+# from d4rl.kitchen import kitchen_envs
+# from d4rl.locomotion import ant
 import numpy as np
 import torch
 from wandb.sdk.wandb_run import Run
@@ -22,7 +22,7 @@ def run_reward_conditioning(
     parameters: Dict[str, Union[int, float, str, bool]],
     loaded_policies: Iterable[policies.RvS],
     attribute_dicts: List[Dict[str, Union[int, float, str]]],
-    env: offline_env.OfflineEnv,
+    env: "offline_env.OfflineEnv",
     trajectory_samples: int = 200,
     file_tag: str = "r_target",
     targets: str = "of expert",
@@ -66,7 +66,7 @@ def compare_commands_to_demonstrator(
     parameters: Dict[str, Union[int, float, str, bool]],
     loaded_policies: Iterable[policies.RvS],
     attribute_dicts: List[Dict[str, Union[int, float, str]]],
-    env: offline_env.OfflineEnv,
+    env: "offline_env.OfflineEnv",
     goals: Union[np.ndarray, List[np.ndarray]],
     goal_names: List[Union[str, int, float]],
     file_tag: str = "Iter",
@@ -125,7 +125,7 @@ def command_kitchen_subtasks(
     parameters: Dict[str, Union[int, float, str, bool]],
     loaded_policies: Iterable[policies.RvS],
     attribute_dicts: List[Dict[str, Union[int, float, str]]],
-    env: kitchen_envs.KitchenBase,
+    env: "kitchen_envs.KitchenBase",
     trajectory_samples: int = 200,
     wandb_run: Optional[Run] = None,
 ) -> None:
@@ -153,7 +153,7 @@ def analyze_antmaze(
     parameters: Dict[str, Union[int, float, str, bool]],
     loaded_policies: Iterable[policies.RvS],
     attribute_dicts: List[Dict[str, Union[int, float, str]]],
-    env: ant.AntMazeEnv,
+    env: "ant.AntMazeEnv",
     trajectory_samples: int = 200,
     wandb_run: Optional[Run] = None,
 ) -> None:
@@ -176,7 +176,7 @@ def use_elite_goals(
     parameters: Dict[str, Union[int, float, str, bool]],
     loaded_policies: List[policies.RvS],
     attribute_dicts: List[Dict[str, Union[int, float, str]]],
-    env: offline_env.OfflineEnv,
+    env: "offline_env.OfflineEnv",
     trajectory_samples: int = 200,
     wandb_run: Optional[Run] = None,
 ) -> None:
@@ -207,7 +207,7 @@ def vary_commanded_goal(
     parameters: Dict[str, Union[int, float, str, bool]],
     loaded_policies: Iterable[policies.RvS],
     attribute_dicts: List[Dict[str, Union[int, float, str]]],
-    env: offline_env.OfflineEnv,
+    env: "offline_env.OfflineEnv",
     trajectory_samples: int = 200,
     elite_property: str = "Length",
     elite_traj_fraction: float = 0.05,

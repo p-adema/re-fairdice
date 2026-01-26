@@ -16,9 +16,11 @@ class DropoutActivation(nn.Module):
 
     def __init__(self):
         """Instantiate the dropout and activation layers."""
+        print("DEBUG: DropoutActivation init start")
         super(DropoutActivation, self).__init__()
         self.activation = DropoutActivation.activation_fn()
         self.dropout = nn.Dropout(p=DropoutActivation.p)
+        print("DEBUG: DropoutActivation init end")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Compute a forward pass: activation function first, then dropout."""

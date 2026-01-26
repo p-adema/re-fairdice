@@ -6,8 +6,6 @@ from abc import ABC, abstractmethod
 import os
 import random
 from typing import Dict, Iterator, List, Optional, Tuple, Union
-
-from d4rl import offline_env
 import gym
 import numpy as np
 import pytorch_lightning as pl
@@ -408,7 +406,7 @@ class D4RLTensorDatasetDataModule(AbstractDataModule):
 
     def __init__(
         self,
-        env: offline_env.OfflineEnv,
+        env: "offline_env.OfflineEnv",
         batch_size: int,
         val_frac: float = 0.1,
         num_workers: Optional[int] = None,
@@ -464,7 +462,7 @@ class D4RLRvSRDataModule(D4RLTensorDatasetDataModule):
 
     def __init__(
         self,
-        env: offline_env.OfflineEnv,
+        env: "offline_env.OfflineEnv",
         batch_size: int,
         val_frac: float = 0.1,
         num_workers: Optional[int] = None,
@@ -493,7 +491,7 @@ class D4RLRvSGDataModule(AbstractDataModule):
 
     def __init__(
         self,
-        env: offline_env.OfflineEnv,
+        env: "offline_env.OfflineEnv",
         batch_size: int = 32,
         val_frac: float = 0.1,
         num_workers: Optional[int] = None,

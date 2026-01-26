@@ -68,7 +68,9 @@ class Trainer:
         cur_step = (ep+1) * self.n_steps_per_iter
 
 
+
         set_final_return, set_unweighted_raw_return, set_weighted_raw_return, set_cum_r_original = [], [], [], []
+        set_unweighted_raw_return_all, set_cum_r_original_all = [], []
         for eval_fn in self.eval_fns:
             
             outputs, final_returns, unweighted_raw_returns, weighted_raw_returns, cum_r_original = eval_fn(self.model, cur_step)
@@ -76,6 +78,8 @@ class Trainer:
             set_unweighted_raw_return.append(np.mean(unweighted_raw_returns, axis=0))
             set_weighted_raw_return.append(np.mean(weighted_raw_returns, axis=0))
             set_cum_r_original.append(np.mean(cum_r_original, axis=0))
+            set_unweighted_raw_return_all.append(unweighted_raw_returns)
+            set_cum_r_original_all.append(cum_r_original)
             for k, v in outputs.items():
                 logs[f'evaluation/{k}'] = v
 
@@ -103,6 +107,8 @@ class Trainer:
             'rollout_unweighted_raw_r': rollout_unweighted_raw_r,
             'rollout_weighted_raw_r': rollout_weighted_raw_r, # for finding [achieved return vs. target return]
             'rollout_original_raw_r': rollout_original_raw_r, # unnormalized raw_r, for calculating roll-out ratio
+            'rollout_unweighted_raw_r_all': np.array(set_unweighted_raw_return_all), # (n_prefs, n_episodes, n_obj)
+            'rollout_original_raw_r_all': np.array(set_cum_r_original_all), # (n_prefs, n_episodes, n_obj)
         }
         
         visualize(rollout_logs, self.logsdir, cur_step)

@@ -112,11 +112,13 @@ def experiment(
         scale *= 10
     
     # if using multiple dataset, load all at once
-    dataset_paths = [f"data/{env_name}/{env_name}_50000_{d}.pkl" for d in dataset]
+    dataset_paths = [f"/scratch-shared/scur0076/data/{env_name}/{env_name}_50000_{d}.pkl" for d in dataset]
+
     trajectories = []
     for data_path in dataset_paths:
         with open(data_path, 'rb') as f:
             trajectories.extend(pickle.load(f))
+
 
     states, traj_lens, returns, returns_mo, preferences = [], [], [], [], []
     min_each_obj_step = np.min(np.vstack([np.min(traj['raw_rewards'], axis=0) for traj in trajectories]), axis=0)
@@ -136,7 +138,9 @@ def experiment(
         returns_mo.append(traj['raw_rewards'].sum(axis=0))
         preferences.append(traj['preference'][0, :])
         
-    traj_lens, returns, returns_mo, states, preferences = np.array(traj_lens), np.array(returns), np.array(returns_mo), np.array(states), np.array(preferences)
+    traj_lens, returns, returns_mo, preferences = np.array(traj_lens), np.array(returns), np.array(returns_mo), np.array(preferences)
+    # Handle ragged states (varying lengths) by using object array or keeping as list/array of objects
+    states = np.array(states, dtype=object)
 
     if not isCloseToOne(percent_dt):
         num_traj_wanted = int(percent_dt * len(trajectories))
@@ -261,6 +265,7 @@ def experiment(
             attn_pdrop=variant['dropout']
         ).to(device=device)
     elif model_type == "rvs":
+
         # change dimension for concatenating preference
         # we don't really use anything in the obs space other than dimension
         observation_space_place_holder = Box(
@@ -284,6 +289,7 @@ def experiment(
             reward_conditioning=True,
             env_name=env_name,
         ).to(device=device)
+
         model.state_dim = state_dim
         model.act_dim = act_dim
         model.pref_dim = pref_dim
@@ -326,6 +332,7 @@ def experiment(
     max_final_r = np.max(returns)
     min_final_r = np.min(returns)
 
+
     trainer = Trainer(
         model=model,
         optimizer=optimizer,
@@ -346,10 +353,10 @@ def experiment(
         concat_act_pref=concat_act_pref,
         logsdir=logsdir
     )
+
     
     
     for iter in range(max_iters):
-
         step = int((iter+1) * num_steps_per_iter)
         logs, rollout_logs = trainer.train_iteration(ep=iter)
         
@@ -399,19 +406,19 @@ if __name__ == '__main__':
     parser.add_argument('--num_steps_per_iter', type=int, default=5000)
     parser.add_argument('--device', type=str, default='cuda')
     parser.add_argument('--dir', type=str, default='test_dir')
-    parser.add_argument('--log_to_wandb', type=bool, default=False)
+    parser.add_argument('--log_to_wandb', type=lambda x: (str(x).lower() == 'true'), default=False)
     parser.add_argument('--wandb_group', type=str, default='none')
     parser.add_argument('--use_obj', type=int, default=-1) # decay to only 1-obj scenario. -1 default means nothing is decayed
     parser.add_argument('--percent_dt', type=float, default=1) # make DT to only use top% of data, default would be 99%
-    parser.add_argument('--use_pref_predict_action', type=bool, default=False)
+    parser.add_argument('--use_pref_predict_action', type=lambda x: (str(x).lower() == 'true'), default=False)
     parser.add_argument('--concat_state_pref', type=int, default=0)
     parser.add_argument('--concat_rtg_pref', type=int, default=0)
     parser.add_argument('--concat_act_pref', type=int, default=0)
-    parser.add_argument('--normalize_reward', type=bool, default=False)
-    parser.add_argument('--mo_rtg', type=bool, default=False)
-    parser.add_argument('--eval_only', type=bool, default=False)
-    parser.add_argument('--return_loss', type=bool, default=False)
-    parser.add_argument('--pref_loss', type=bool, default=False)
+    parser.add_argument('--normalize_reward', type=lambda x: (str(x).lower() == 'true'), default=False)
+    parser.add_argument('--mo_rtg', type=lambda x: (str(x).lower() == 'true'), default=False)
+    parser.add_argument('--eval_only', type=lambda x: (str(x).lower() == 'true'), default=False)
+    parser.add_argument('--return_loss', type=lambda x: (str(x).lower() == 'true'), default=False)
+    parser.add_argument('--pref_loss', type=lambda x: (str(x).lower() == 'true'), default=False)
     parser.add_argument('--optimizer', type=str, default="adam") # adam, lamb
     parser.add_argument('--eval_context_length', type=int, default=5)
     parser.add_argument('--rtg_scale', type=float, default=1)

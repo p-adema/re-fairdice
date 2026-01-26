@@ -130,8 +130,9 @@ class RvS(pl.LightningModule):
         net_arch = [hidden_size] * depth
         layers.DropoutActivation.activation_fn = activation_fn
         layers.DropoutActivation.p = dropout_p
-        action_space.high = np.array([1, 1, 1])
-        action_space.low = np.array([-1, -1, -1])
+        # action_space.high = np.array([1, 1, 1])
+        # action_space.low = np.array([-1, -1, -1])
+        print("DEBUG: Before ExtendedActorCriticPolicy init")
         self.model = ExtendedActorCriticPolicy(
             observation_goal_space,
             action_space,
@@ -142,6 +143,7 @@ class RvS(pl.LightningModule):
             activation_fn=layers.DropoutActivation,
             squash_output=False
         )
+        print("DEBUG: After ExtendedActorCriticPolicy init")
         # self.model.action_space.high = np.array([1, 1, 1])
         # self.model.action_space.low = np.array([-1, -1, -1])
 
@@ -291,6 +293,7 @@ class ExtendedActorCriticPolicy(policies.ActorCriticPolicy):
             lr_schedule,
             **kwargs,
         )
+        print("DEBUG: ExtendedActorCriticPolicy super init done")
         self.state_dim = state_dim
         self.act_dim = act_dim
         
@@ -299,6 +302,11 @@ class ExtendedActorCriticPolicy(policies.ActorCriticPolicy):
         self.action_net, self.log_std = self.action_dist.proba_distribution_net(
             latent_dim=latent_dim_pi, log_std_init=self.log_std_init
         )
+
+    def _setup_model(self) -> None:
+        print("DEBUG: ExtendedActorCriticPolicy _setup_model start")
+        super()._setup_model()
+        print("DEBUG: ExtendedActorCriticPolicy _setup_model end")
 
 
     def _build(self, lr_schedule: type_aliases.Schedule) -> None:

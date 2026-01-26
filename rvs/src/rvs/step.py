@@ -6,11 +6,11 @@ import os
 import sys
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
-import d4rl  # noqa F401 Import needed to register d4rl envs
-from d4rl import infos, offline_env
-from d4rl.kitchen import kitchen_envs
-from d4rl.kitchen.adept_envs.franka import kitchen_multitask_v0
-from d4rl.locomotion import ant
+# import d4rl  # noqa F401 Import needed to register d4rl envs
+# from d4rl import infos, offline_env
+# from d4rl.kitchen import kitchen_envs
+# from d4rl.kitchen.adept_envs.franka import kitchen_multitask_v0
+# from d4rl.locomotion import ant
 # from gcsl import envs
 # from gcsl.algo import variants
 # from gcsl.envs import goal_env
@@ -176,6 +176,7 @@ def is_antmaze_env(env: gym.Env) -> bool:
 def render_env(env: gym.Env, mode="human") -> Union[np.ndarray, None]:
     """Helper function that provides special case for rendering D4RL kitchen envs."""
     if is_kitchen_env(env):
+        from d4rl.kitchen.adept_envs.franka import kitchen_multitask_v0
         return kitchen_multitask_v0.KitchenTaskRelaxV1.render(env, mode=mode)
     else:
         return env.render(mode=mode)
@@ -227,14 +228,14 @@ def rollout_and_render(
     return frames  # pytype: disable=bad-return-type
 
 
-def get_valid_kitchen_subtasks(env: kitchen_envs.KitchenBase) -> List[str]:
+def get_valid_kitchen_subtasks(env: "kitchen_envs.KitchenBase") -> List[str]:
     """Create list of valid subtasks to command in a D4RL Kitchen env."""
     valid_subtasks = ["all"] + ["random"] + [task for task in env.TASK_ELEMENTS]
     return valid_subtasks
 
 
 def get_kitchen_goal(
-    env: kitchen_envs.KitchenBase,
+    env: "kitchen_envs.KitchenBase",
     subtask: str = "microwave",
     render_goal_frame: bool = False,
 ) -> Tuple[np.ndarray, Union[np.ndarray, None]]:
@@ -259,6 +260,7 @@ def get_kitchen_goal(
             render_goal_frame=render_goal_frame,
         )
     else:
+        from d4rl.kitchen import kitchen_envs
         goal = obs_1[:30]
         goal_frame = None
         subtask_collection = env.TASK_ELEMENTS if subtask == "all" else [subtask]
@@ -271,7 +273,7 @@ def get_kitchen_goal(
 
 
 def get_random_kitchen_goal(
-    env: kitchen_envs.KitchenBase,
+    env: "kitchen_envs.KitchenBase",
     random_horizon: int = 50,
     render_goal_frame: bool = False,
 ) -> Tuple[np.ndarray, Union[np.ndarray, None]]:
@@ -290,7 +292,7 @@ def get_random_kitchen_goal(
 
 
 def get_dynamic_kitchen_goal(
-    env: kitchen_envs.KitchenBase,
+    env: "kitchen_envs.KitchenBase",
     obs: np.ndarray,
 ) -> np.ndarray:
     """Get the goal for the next subtask that needs to be completed in the kitchen."""
@@ -298,6 +300,7 @@ def get_dynamic_kitchen_goal(
     fixed = obs[30:]
     for subtask in env.TASK_ELEMENTS:
         if subtask in env.tasks_to_complete:
+            from d4rl.kitchen import kitchen_envs
             subtask_indices = kitchen_envs.OBS_ELEMENT_INDICES[subtask]
             subtask_goals = kitchen_envs.OBS_ELEMENT_GOALS[subtask]
             goal[subtask_indices] = subtask_goals
@@ -365,7 +368,7 @@ def sample_elite_steps(
 
 def sample_cumulative_reward(
     policy: Union[policies.RvS, Callable[[np.ndarray, np.ndarray], np.ndarray]],
-    env: offline_env.OfflineEnv,
+    env: "offline_env.OfflineEnv",
     goals: Optional[Union[np.ndarray, List[np.ndarray]]] = None,
     trajectory_samples: int = 2000,
     return_goals: bool = False,
@@ -433,7 +436,7 @@ def sample_with_reward_conditioning(
 
 def find_elite_goals(
     policy: Union[policies.RvS, Callable[[np.ndarray, np.ndarray], np.ndarray]],
-    env: offline_env.OfflineEnv,
+    env: "offline_env.OfflineEnv",
     trajectory_samples: int = 200,
     num_elites: int = 6,
 ) -> np.ndarray:
@@ -454,7 +457,7 @@ def find_elite_goals(
 
 def evaluate_goals(
     policy: Union[policies.RvS, Callable[[np.ndarray, np.ndarray], np.ndarray]],
-    env: offline_env.OfflineEnv,
+    env: "offline_env.OfflineEnv",
     goals: Iterable[np.ndarray],
     trajectory_samples: int = 200,
 ) -> List[np.ndarray]:
@@ -499,7 +502,7 @@ def sample_hitting_times(
 
 def sample_episode_performance(
     policy,
-    env: Union[GCSLToGym, offline_env.OfflineEnv],
+    env: Union[GCSLToGym, "offline_env.OfflineEnv"],
     env_name: str,
     max_episode_steps: int,
     traj_samples: int = 2000,
@@ -539,7 +542,7 @@ def sample_episode_performance(
 
 
 def get_reward_targets(
-    env: Union[offline_env.OfflineEnv, gym.wrappers.TimeLimit],
+    env: Union["offline_env.OfflineEnv", gym.wrappers.TimeLimit],
     env_name: str,
     reward_fractions: List[float],
     targets: str = "of expert",
@@ -573,7 +576,9 @@ def get_reward_targets(
         if "antmaze" in env_name:
             reward_min = 0
             reward_max = 1
+            reward_max = 1
         else:
+            from d4rl import infos
             reward_min = infos.REF_MIN_SCORE[env_name]
             reward_max = infos.REF_MAX_SCORE[env_name]
         if average_reward_to_go:
@@ -590,7 +595,7 @@ def get_reward_targets(
 
 def eval_reward_conditioning(
     policy: Union[policies.RvS, Callable[[np.ndarray, np.ndarray], np.ndarray]],
-    env: offline_env.OfflineEnv,
+    env: "offline_env.OfflineEnv",
     env_name: str,
     reward_fractions: List[float],
     trajectory_samples: int = 200,
@@ -633,7 +638,7 @@ def eval_reward_conditioning(
 
 def eval_d4rl_antmaze(
     policy: Union[policies.RvS, Callable[[np.ndarray, np.ndarray], np.ndarray]],
-    env: ant.AntMazeEnv,
+    env: "ant.AntMazeEnv",
     trajectory_samples: int = 200,
 ) -> np.ndarray:
     """Evaluate cumulative reward in AntMaze."""
@@ -688,7 +693,7 @@ def create_env(
     max_episode_steps: int,
     discretize: bool,
     seed: Optional[int] = None,
-) -> Union[GCSLToGym, offline_env.OfflineEnv]:
+) -> Union[GCSLToGym, "offline_env.OfflineEnv"]:
     """Helper function to create an environment.
 
     Args:

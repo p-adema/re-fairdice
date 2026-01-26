@@ -7,8 +7,6 @@ import os
 from typing import Optional, Union
 
 import configargparse
-from d4rl import offline_env
-# from gcsl import envs
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
@@ -42,7 +40,7 @@ def log_args(
 
 
 def run_training(
-    env: Union[step.GCSLToGym, offline_env.OfflineEnv],
+    env: Union[step.GCSLToGym, "offline_env.OfflineEnv"],
     env_name: str,
     seed: int,
     wandb_logger: pl.loggers.wandb.WandbLogger,

@@ -6,7 +6,7 @@ import os
 from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 import configargparse
-from d4rl import offline_env
+# from d4rl import offline_env
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -62,7 +62,7 @@ def aggregate_performance(
 def get_performance_vec(
     checkpoint_file: str,
     max_episode_steps: int,
-    env: Union[step.GCSLToGym, offline_env.OfflineEnv],
+    env: Union[step.GCSLToGym, "offline_env.OfflineEnv"],
     env_name: str,
     device: torch.device,
     hitting_time_samples: int = 2000,
@@ -108,7 +108,7 @@ def get_performance_vec(
 
 def get_performance_vecs(
     checkpoints: Iterable[str],
-    env: Union[step.GCSLToGym, offline_env.OfflineEnv],
+    env: Union[step.GCSLToGym, "offline_env.OfflineEnv"],
     env_name: str,
     device: torch.device,
     max_episode_steps: int,
@@ -156,7 +156,7 @@ def get_episode_rewards(
     return episode_rewards
 
 
-def get_demonstrator_reward_vec(env: offline_env.OfflineEnv) -> np.ndarray:
+def get_demonstrator_reward_vec(env: "offline_env.OfflineEnv") -> np.ndarray:
     """Calculate the demonstrator's reward for each episode."""
     dataset = env.get_dataset()
     dones = np.logical_or(dataset["terminals"], dataset["timeouts"])

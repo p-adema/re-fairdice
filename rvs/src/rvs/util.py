@@ -8,7 +8,7 @@ import os
 import random
 from typing import Dict, List, Optional, Tuple, Union
 
-from d4rl import offline_env
+# from d4rl import offline_env
 from gym import spaces
 import numpy as np
 import torch
@@ -228,7 +228,7 @@ def load_experiment(
     List[str],
     List[Dict[str, Union[int, float, str]]],
     Dict[str, Union[int, float, str, bool]],
-    Union[step.GCSLToGym, offline_env.OfflineEnv],
+    Union[step.GCSLToGym, "offline_env.OfflineEnv"],
 ]:
     """Load experiment from the output directory.
 
