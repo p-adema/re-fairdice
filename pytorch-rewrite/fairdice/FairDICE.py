@@ -23,7 +23,6 @@ COMPILE_OPTIONS = {
     "triton.cudagraphs": True,
     "coordinate_descent_tuning": True,
 }
-torch.set_float32_matmul_precision("high")
 
 
 class FairDICE(nn.Module):
@@ -62,12 +61,12 @@ class FairDICE(nn.Module):
         )
 
     def save(self, path: str | Path):
-        torch.save(self.state_dict(), path)
+        torch.save((self.config.__dict__, self.state_dict()), path)
 
     @classmethod
     def load(cls, path: str | Path) -> FairDICE:
-        state_dict = torch.load(path)
-        self = cls(state_dict["config"])
+        config, state_dict = torch.load(path)
+        self = cls(SimpleNamespace(**config))
         self.load_state_dict(state_dict)
         return self
 
@@ -91,8 +90,6 @@ class FairDICE(nn.Module):
         self.mu_optim.step()
         self.policy_optim.step()
         self.policy_sched.step()
-
-    # @torch.compile(options=COMPILE_OPTIONS)
 
     @torch.compile(options=COMPILE_OPTIONS)
     def _loss(self, batch: Batch) -> tuple[Tensor, Tensor]:
@@ -122,14 +119,9 @@ class FairDICE(nn.Module):
         stable_w = relu(f_derivative_inverse(e_renorm / self.config.beta, f_divergence))
         stable_w /= stable_w.mean() + 1e-8
 
-        policy_loss = -(
-            batch.is_valids * stable_w * log_probs
-        ).sum() / batch.is_valids.sum().add(1e-8)
-        # print(
-            # f"{loss_1=} {loss_2=} {loss_3=} {policy_loss=}\n "
-            # f"{batch.actions[:5]=} {log_probs[:5]=} {stable_w[:5]=}\n"
-            # f"{action_dist.loc[:5]=}\n{action_dist.scale[:5]=}"
-        # )
+        weighted_probs = batch.is_valids.view(-1) * stable_w.view(-1) * log_probs
+        policy_loss = -weighted_probs.sum() / batch.is_valids.sum().add(1e-8)
+
         return mu_nu_loss, policy_loss
 
     def print_summary(self):

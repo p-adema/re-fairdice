@@ -6,8 +6,8 @@ Learner=FairDICE
 Divergence=SOFT_CHI
 for ENV in MO-Hopper-v2 MO-Walker2d-v2 MO-Swimmer-v2 MO-HalfCheetah-v2 MO-Ant-v2 MO-Hopper-v3; do
     for quality in expert amateur; do
-        for beta in 1 0.1 0.01 0.001 0.0001; do
-            for seed in 1 2 3 4 5; do
+        for beta in 10 1 0.1 0.01 0.001 0.0001 0.00001; do
+            for seed in 1 2 3 4 5 6 7 8 9 10; do
                 echo "Running $Learner $ENV $quality $beta $seed"
                 if [ "$ENV" == "MO-Hopper-v3" ]; then
                     num_layers=4
@@ -19,7 +19,7 @@ for ENV in MO-Hopper-v2 MO-Walker2d-v2 MO-Swimmer-v2 MO-HalfCheetah-v2 MO-Ant-v2
                 else
                     hidden_dim=768
                 fi
-                uv run main.py \
+                uv run train.py \
                     --learner $Learner \
                     --divergence $Divergence \
                     --env_name $ENV \
@@ -31,9 +31,10 @@ for ENV in MO-Hopper-v2 MO-Walker2d-v2 MO-Swimmer-v2 MO-HalfCheetah-v2 MO-Ant-v2
                     --batch_size 256 \
                     --hidden_dim $hidden_dim \
                     --num_layers $num_layers \
-                    --total_train_steps 100000 \
-                    --log_interval 10000 \
-                    --normalize_reward True
+                    --total_train_steps 100_000 \
+                    --log_interval 10_000 \
+                    --normalize_reward True \
+                    --save_path ./pt-fix-grad0
             done
         done
     done

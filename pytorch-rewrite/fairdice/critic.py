@@ -18,6 +18,7 @@ class Critic(nn.Module):
     ):
         super().__init__()
         if state_action_input:
+            assert action_dim
             observation_dim += action_dim
 
         self.critic = MLP(

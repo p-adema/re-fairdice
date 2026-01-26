@@ -16,7 +16,7 @@ class Walker2dEnv(MujocoEnv, EzPickle):
         MujocoEnv.__init__(
             self,
             model_path=str(Path(__file__).parent / "assets" / "walker2d.xml"),
-            frame_skip=5,
+            frame_skip=4,
             observation_space=gymnasium.spaces.Box(
                 low=-np.inf, high=np.inf, shape=(17,), dtype=np.float64
             ),

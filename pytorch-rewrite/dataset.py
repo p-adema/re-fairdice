@@ -4,7 +4,6 @@ from typing import NamedTuple
 
 import numpy as np
 import numpy.typing as npt
-
 import torch
 from pyarrow.parquet import read_table as read_parquet
 
@@ -54,7 +53,7 @@ class Buffer:
 
     @staticmethod
     def _convert_or_compute(
-        mean_std: tuple[npt.NDArray, npt.NDArray] | None, reference: torch.Tensor
+        mean_std: tuple[torch.Tensor, torch.Tensor] | None, reference: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
         if mean_std is not None:
             mean = torch.asarray(mean_std[0]).to(reference)
@@ -66,8 +65,8 @@ class Buffer:
     def normalise(
         self,
         normalise_rewards: bool,
-        state_mean_std: tuple[npt.NDArray, npt.NDArray] | None,
-        action_mean_std: tuple[npt.NDArray, npt.NDArray] | None,
+        state_mean_std: tuple[torch.Tensor, torch.Tensor] | None,
+        action_mean_std: tuple[torch.Tensor, torch.Tensor] | None,
     ):
         state_mean, state_std = self._convert_or_compute(state_mean_std, self.states)
         self.states.sub_(state_mean).div_(state_std)
@@ -84,7 +83,7 @@ class Buffer:
         return reward_min, reward_max
 
     def shuffle(self):
-        perm = torch.randperm(self.size)
+        perm = torch.randperm(self.size, device=self.states.device)
         self.states = self.states[perm]
         self.next_states = self.next_states[perm]
         self.actions = self.actions[perm]
@@ -112,7 +111,7 @@ class Buffer:
         return batch
 
     def __repr__(self):
-        return f"Buffer(states={self.states}, ...)"
+        return f"Buffer(states={self.states.shape}, ...)"
 
     def __len__(self):
         return len(self.states)

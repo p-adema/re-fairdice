@@ -13,6 +13,8 @@ def orthogonal_init(layer: nn.Module, gain: float = math.sqrt(2)):
             nn.init.zeros_(param)
         elif "weight" in name:
             nn.init.orthogonal_(param, gain=gain)
+        else:
+            print("Warning: uninitialised parameter named:", name)
     return layer
 
 

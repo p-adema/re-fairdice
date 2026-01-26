@@ -1,6 +1,10 @@
+from warnings import simplefilter as _simplefilter
+
 from gymnasium import register as _register
 
 from .constants import objective_counts, state_norm_params
+
+_simplefilter("ignore", DeprecationWarning, 512)  # Hopper-v2 / v3 warning
 
 _register(
     id="MO-Ant-v2",

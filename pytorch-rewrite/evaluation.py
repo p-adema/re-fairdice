@@ -31,21 +31,18 @@ def evaluate_policy(
 
     for step in range(max_steps):
         # print(f"{state.shape=}, {config.STATE_MEAN=} {config.STATE_STD=}")
-        s_t = (state - config.STATE_MEAN) / config.STATE_STD
-        action_dist = policy(torch.asarray(s_t, device=device, dtype=torch.float32))
-        action = (
-            action_dist.mean.numpy(force=True) * config.ACTION_SCALE
-            + config.ACTION_BIAS
-        )
-        state, _rew, term, trunc, info = env.step(action)
+        s_t = (torch.asarray(state) - config.STATE_MEAN) / config.STATE_STD
+        action_dist = policy(s_t.to(device=device, dtype=torch.float32))
+        action = action_dist.mean.cpu() * config.ACTION_SCALE + config.ACTION_BIAS
+        state, _rew, term, trunc, info = env.step(action.numpy(force=True))
         dones[:, step] = term | trunc
         has_completed |= term | trunc
         raw_rewards[:, step] = info["obj"]
         if has_completed.all():
             break
 
-    steps = dones.argmax(1)
-    valid = np.arange(max_steps).reshape(1, -1) <= steps.reshape(-1, 1)
+    steps = dones.argmax(1) + 1
+    valid = np.arange(max_steps).reshape(1, -1) < steps.reshape(-1, 1)
     raw_rewards[~valid] = 0
     raw_returns = raw_rewards.sum(1)
 
