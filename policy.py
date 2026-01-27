@@ -1,9 +1,6 @@
 from flax import nnx
 import jax.numpy as jnp
 
-from flax import nnx
-import jax.numpy as jnp
-
 class MuNetwork(nnx.Module):
     def __init__(self,
                  config):
@@ -154,5 +151,203 @@ class MNDPolicy(nnx.Module):
         if self.tanh_squash:
             return tfd.TransformedDistribution(distribution=dist,
                                                bijector=tfb.Tanh())
+        else:
+            return dist
+
+
+class CNNEncoder(nnx.Module):
+    def __init__(self, 
+                 feature_dim: int = 256,
+                 rngs: nnx.Rngs = nnx.Rngs(0)):
+        # Input: (batch, 480, 480, 3)
+        self.conv1 = nnx.Conv(
+            in_features=3, out_features=32,
+            kernel_size=(8, 8), strides=(4, 4),
+            padding='VALID',
+            rngs=rngs,
+            kernel_init=nnx.initializers.orthogonal(jnp.sqrt(2))
+        )  # -> (batch, 118, 118, 32)
+        
+        self.conv2 = nnx.Conv(
+            in_features=32, out_features=64,
+            kernel_size=(4, 4), strides=(2, 2),
+            padding='VALID',
+            rngs=rngs,
+            kernel_init=nnx.initializers.orthogonal(jnp.sqrt(2))
+        )  # -> (batch, 58, 58, 64)
+        
+        self.conv3 = nnx.Conv(
+            in_features=64, out_features=64,
+            kernel_size=(3, 3), strides=(2, 2),
+            padding='VALID',
+            rngs=rngs,
+            kernel_init=nnx.initializers.orthogonal(jnp.sqrt(2))
+        )  # -> (batch, 28, 28, 64)
+        
+        self.conv4 = nnx.Conv(
+            in_features=64, out_features=64,
+            kernel_size=(3, 3), strides=(2, 2),
+            padding='VALID',
+            rngs=rngs,
+            kernel_init=nnx.initializers.orthogonal(jnp.sqrt(2))
+        )  # -> (batch, 13, 13, 64)
+        
+        self.conv5 = nnx.Conv(
+            in_features=64, out_features=64,
+            kernel_size=(3, 3), strides=(2, 2),
+            padding='VALID',
+            rngs=rngs,
+            kernel_init=nnx.initializers.orthogonal(jnp.sqrt(2))
+        )  # -> (batch, 6, 6, 64)
+        
+        self.fc = nnx.Linear(
+            in_features=6 * 6 * 64,
+            out_features=feature_dim,
+            rngs=rngs,
+            kernel_init=nnx.initializers.orthogonal(jnp.sqrt(2))
+        )
+        
+        self.feature_dim = feature_dim
+        
+    def __call__(self, x):
+        """
+        Process image observations.
+        
+        Args:
+            x: Image tensor of shape (batch, height, width, channels)
+               Expected to be normalized to [0, 1]
+               
+        Returns:
+            Feature vector of shape (batch, feature_dim)
+        """
+        x = nnx.relu(self.conv1(x))
+        x = nnx.relu(self.conv2(x))
+        x = nnx.relu(self.conv3(x))
+        x = nnx.relu(self.conv4(x))
+        x = nnx.relu(self.conv5(x))
+        
+        x = x.reshape(x.shape[0], -1)
+        
+        x = nnx.relu(self.fc(x))
+        
+        return x
+
+
+class CNNDiscretePolicy(nnx.Module):
+    def __init__(self,
+                 action_dim: int,
+                 feature_dim: int = 256,
+                 hidden_dim: int = 256,
+                 rngs: nnx.Rngs = nnx.Rngs(0)):
+        
+        self.encoder = CNNEncoder(feature_dim=feature_dim, rngs=rngs)
+        
+        self.mlp = MLP(
+            din=feature_dim,
+            dout=hidden_dim,
+            hidden_dims=[],
+            rngs=rngs,
+            activate_final=True
+        )
+        
+        self.action_head = nnx.Linear(
+            in_features=hidden_dim,
+            out_features=action_dim,
+            rngs=rngs,
+            kernel_init=nnx.initializers.orthogonal(0.01)
+        )
+        
+        self.action_dim = action_dim
+        
+    def __call__(self, images):
+        """        
+        Args:
+            images: Image tensor of shape (batch, height, width, channels)
+            
+        Returns:
+            Categorical distribution over actions
+        """
+        features = self.encoder(images)
+        
+        x = self.mlp(features)
+        
+        logits = self.action_head(x)
+        
+        return tfd.Categorical(logits=logits)
+
+    """
+    Policy network for continuous actions with CNN encoder for image observations.
+    
+    Similar to GaussianPolicy but uses CNN encoder instead of MLP for observations.
+    """
+    def __init__(self,
+                 action_dim: int,
+                 feature_dim: int = 256,
+                 hidden_dims: list = [256, 256],
+                 temperature: float = 1.0,
+                 tanh_squash_distribution: bool = True,
+                 log_std_scale: float = 1e-3,
+                 rngs: nnx.Rngs = nnx.Rngs(0)):
+        
+        self.temperature = temperature
+        self.tanh_squash_distribution = tanh_squash_distribution
+        
+        self.encoder = CNNEncoder(feature_dim=feature_dim, rngs=rngs)
+        
+        self.mlp = MLP(
+            din=feature_dim,
+            dout=hidden_dims[-1],
+            hidden_dims=hidden_dims[:-1],
+            rngs=rngs,
+            activate_final=True
+        )
+        
+        # Mean and std heads
+        self.mean_layer = nnx.Linear(
+            hidden_dims[-1], action_dim, rngs=rngs,
+            kernel_init=nnx.initializers.orthogonal(jnp.sqrt(2))
+        )
+        self.std_layer = nnx.Linear(
+            hidden_dims[-1], action_dim, rngs=rngs,
+            kernel_init=nnx.initializers.orthogonal(log_std_scale)
+        )
+        
+        self.action_dim = action_dim
+        
+    def __call__(self, images):
+        """
+        Compute action distribution from image observations.
+        
+        Args:
+            images: Image tensor of shape (batch, height, width, channels)
+            
+        Returns:
+            MultivariateNormalDiag distribution over actions
+        """
+        # Encode images to features
+        features = self.encoder(images)
+        
+        # Pass through MLP
+        x = self.mlp(features)
+        
+        # Compute mean and log_std
+        means = self.mean_layer(x)
+        if not self.tanh_squash_distribution:
+            means = jnp.tanh(means)
+            
+        log_stds = self.std_layer(x)
+        log_stds = jnp.clip(log_stds, LOG_STD_MIN, LOG_STD_MAX)
+        
+        # Create distribution
+        dist = tfd.MultivariateNormalDiag(
+            loc=means,
+            scale_diag=jnp.exp(log_stds) * self.temperature
+        )
+        
+        if self.tanh_squash_distribution:
+            return tfd.TransformedDistribution(
+                distribution=dist,
+                bijector=tfb.Tanh()
+            )
         else:
             return dist

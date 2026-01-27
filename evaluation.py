@@ -12,15 +12,40 @@ def evaluate_policy(config, policy, env, save_dir, num_episodes=3, max_steps=500
     discounted_raw_returns = []          
     discounted_normalized_returns = []
     
+    use_cnn = getattr(config, 'use_cnn', False)
+    
     @jax.jit
     def select_action(observation):
-        dist = policy(observation)
-        action = dist.mean() # deterministic action
-        return action.flatten()
+        if use_cnn:
+            # (H, W, C) -> (1, H, W, C)
+            obs_batched = observation[None, ...]
+        else:
+            obs_batched = observation[None, :]
+        dist = policy(obs_batched)
+        if config.is_discrete:
+            action = dist.mode()[0]  # argmax sampling
+        else:
+            action = dist.mean().flatten()  # deterministic action for continuous
+        return action
+    
+    def preprocess_state(state):
+        """Preprocess state for policy input based on observation type."""
+        if use_cnn:
+            if state.max() > 1.0:
+                return state.astype(np.float32) / 255.0
+            return state.astype(np.float32)
+        else:
+            return normalization(state, config.state_mean, config.state_std)
 
     for iter in range(num_episodes):
-        env.seed(iter)
-        state = env.reset()
+        try:
+            env.seed(iter)
+            state = env.reset()
+        except (TypeError, AttributeError):
+            state = env.reset(seed=iter)
+            if isinstance(state, tuple):
+                state = state[0]
+        
         done = False
         steps = 0
         raw_rewards_list = []
@@ -30,11 +55,20 @@ def evaluate_policy(config, policy, env, save_dir, num_episodes=3, max_steps=500
         steps_list = []
         
         while not done and steps < max_steps:
-            s_t = normalization(state, config.state_mean, config.state_std)
-            action = (select_action(s_t)* config.ACTION_SCALE + config.ACTION_BIAS).astype(np.float32)
-            state, _, done, info= env.step(action)
+            s_t = preprocess_state(state)
+            if config.is_discrete:
+                action = int(select_action(s_t))
+            else:
+                action = (select_action(s_t) * config.ACTION_SCALE + config.ACTION_BIAS).astype(np.float32)
             
-
+            step_result = env.step(action)
+            if len(step_result) == 4:
+                state, _, done, info = step_result
+            else:
+                # Gymnasium returns (obs, reward, terminated, truncated, info)
+                state, _, terminated, truncated, info = step_result
+                done = terminated or truncated
+        
 
             raw_rewards = info['obj']
             raw_rewards_list.append(raw_rewards)
@@ -61,10 +95,11 @@ def evaluate_policy(config, policy, env, save_dir, num_episodes=3, max_steps=500
     avg_discounted_raw_returns = np.mean(discounted_raw_returns, axis=0)
     avg_discounted_normalized_returns = np.mean(discounted_normalized_returns, axis=0)
     avg_steps = np.mean(steps_list)
-    avg_raw_nsw_score = np.mean(np.sum(np.log(raw_returns), axis=1))
-    avg_normalized_nsw_score = np.mean(np.sum(np.log(normalized_returns), axis=1))
-    avg_discounted_raw_nsw_score = np.mean(np.sum(np.log(discounted_raw_returns), axis=1))
-    avg_discounted_normalized_nsw_score = np.mean(np.sum(np.log(discounted_normalized_returns), axis=1))
+    eps = 1e-8  # for numerical stability
+    avg_raw_nsw_score = np.mean(np.sum(np.log(np.maximum(np.array(raw_returns), eps)), axis=1))
+    avg_normalized_nsw_score = np.mean(np.sum(np.log(np.maximum(np.array(normalized_returns), eps)), axis=1))
+    avg_discounted_raw_nsw_score = np.mean(np.sum(np.log(np.maximum(np.array(discounted_raw_returns), eps)), axis=1))
+    avg_discounted_normalized_nsw_score = np.mean(np.sum(np.log(np.maximum(np.array(discounted_normalized_returns), eps)), axis=1))
     avg_raw_usw_score = np.mean(np.sum(raw_returns, axis=1))
     avg_normalized_usw_score = np.mean(np.sum(normalized_returns, axis=1))
     avg_raw_discounted_usw_score = np.mean(np.sum(discounted_raw_returns, axis=1))
@@ -96,14 +131,15 @@ def evaluate_policy(config, policy, env, save_dir, num_episodes=3, max_steps=500
                 "eval/avg_raw_usw_score": avg_raw_usw_score,
             }, step=t_env)
         else:
-            print(f"Avg raw returns: {avg_raw_returns}")
-            print(f"Avg normalized returns: {avg_normalized_returns}")
-            print(f"Avg discounted raw returns: {avg_discounted_raw_returns}")
-            print(f"Avg discounted normalized returns: {avg_discounted_normalized_returns}")
-            print(f"Avg steps: {avg_steps}")
-            print(f"Avg raw NSW score: {avg_raw_nsw_score}")
-            print(f"Avg normalized NSW score: {avg_normalized_nsw_score}")
-            print(f"Avg discounted raw NSW score: {avg_discounted_raw_nsw_score}")
-            print(f"Avg discounted normalized NSW score: {avg_discounted_normalized_nsw_score}")
+            pass
+            # print(f"Avg raw returns: {avg_raw_returns}")
+            # print(f"Avg normalized returns: {avg_normalized_returns}")
+            # print(f"Avg discounted raw returns: {avg_discounted_raw_returns}")
+            # print(f"Avg discounted normalized returns: {avg_discounted_normalized_returns}")
+            # print(f"Avg steps: {avg_steps}")
+            # print(f"Avg raw NSW score: {avg_raw_nsw_score}")
+            # print(f"Avg normalized NSW score: {avg_normalized_nsw_score}")
+            # print(f"Avg discounted raw NSW score: {avg_discounted_raw_nsw_score}")
+            # print(f"Avg discounted normalized NSW score: {avg_discounted_normalized_nsw_score}")
 
-    return raw_returns, normalized_returns
+    return avg_raw_returns, normalized_returns, avg_steps

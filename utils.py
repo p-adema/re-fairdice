@@ -125,3 +125,28 @@ def normalization(x, mean, std):
 def min_max_normalization(x, min, max, eps=1e-8):
     x = (x - min) / (max - min + eps)
     return x
+
+
+def social_welfare(returns, alpha, eps=1e-5):
+    """Compute social welfare with parameter alpha (isoelastic utility).
+    
+    Args:
+        returns: Array of returns per objective
+        alpha: Fairness parameter
+            alpha=1.0: NSW (Nash Social Welfare) = sum(log(returns))
+            alpha=0.0: USW (Utilitarian Social Welfare) = sum(returns)
+            0 < alpha < 1: Interpolates between USW and NSW
+        eps: Small value for numerical stability
+    
+    Returns:
+        Social welfare score (higher is better)
+    """
+    returns = np.maximum(returns, eps)
+    
+    if abs(alpha - 1.0) < 1e-6:
+        # NSW: sum of log returns
+        return np.sum(np.log(returns))
+    else:
+        # Isoelastic utility: sum(x^(1-alpha)) / (1-alpha)
+        # For alpha=0: sum(x), for alpha→1: sum(log(x))
+        return np.sum(np.power(returns, 1 - alpha)) / (1 - alpha)

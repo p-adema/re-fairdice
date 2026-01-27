@@ -6,10 +6,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
  
+
 class MOFourRoomsEnv(gym.Env):
     def __init__(self):
         super().__init__()
-        # hardcode for now, deal with 8 objectives later
+
         self.layout = """
 wwwwwwwwwwwww
 w     w     w
@@ -59,7 +60,7 @@ wwwwwwwwwwwww
         dy, dx = self.deltas[action]
         ny, nx = self.agent_pos[0] + dy, self.agent_pos[1] + dx
         
-        # Wall collision check
+        # wall collision check
         if not self.occupancy[ny, nx]:
             self.agent_pos = (ny, nx)
             
@@ -69,13 +70,14 @@ wwwwwwwwwwwww
         
         for i, goal in enumerate(self.goals):
             if self.agent_pos == goal:
-                # assert 0, (self.agent_pos, self.steps, goal)
                 reward_vec[i] = 1.0
                 done = True
-                break
                 
         if self.steps >= self.max_steps:
             done = True
+            # for i, goal in enumerate(self.goals):
+            #     dist = (goal[0] - self.agent_pos[0]) ** 2 + (goal[1] - self.agent_pos[1]) ** 2
+            #     reward_vec[i] = 1 / (1 + dist)
         
         return np.array(self.agent_pos, dtype=np.float32), np.sum(reward_vec), done, {'obj': reward_vec}
  
@@ -83,49 +85,15 @@ wwwwwwwwwwwww
         return self.occupancy
  
  
-def generate_dataset(num_trajectories=300):
-    env = MOFourRoomsEnv()
-    dataset = []
-    
-    print(f"Generating {num_trajectories} trajectories...")
-    for _ in range(num_trajectories):
-        obs = env.reset()
-        done = False
-        traj_obs, traj_next_obs, traj_actions, traj_rewards = [], [], [], []
-        traj_terminals, traj_timeouts = [], []
-        
-        while not done:
-            action = env.action_space.sample()
-            next_obs, reward, done, info = env.step(action)
-            timeout = (env.steps >= env.max_steps)
-            terminal = done and not timeout
-            
-            traj_obs.append(obs)
-            traj_actions.append(action)
-            traj_rewards.append(info['obj'])
-            traj_next_obs.append(next_obs)
-            traj_terminals.append(terminal)
-            traj_timeouts.append(timeout)
-            
-            obs = next_obs
- 
-        dataset.append({
-            'observations': np.array(traj_obs),
-            'actions': np.array(traj_actions, dtype=np.float32).reshape(-1, 1),
-            'next_observations': np.array(traj_next_obs),
-            'raw_rewards': np.array(traj_rewards),
-            'terminals': np.array(traj_terminals),
-            'timeouts': np.array(traj_timeouts),
-            'preference': np.ones((len(traj_obs), 3)) / 3.0
-        })
-        
-    os.makedirs("data/MO-FourRooms", exist_ok=True)
-    save_path = "data/MO-FourRooms/MO-FourRooms_expert_uniform.pkl"
-    with open(save_path, "wb") as f:
-        pickle.dump(dataset, f)
-    print(f"Dataset saved to {save_path}")
-    return dataset
- 
+def obs_to_onehot(obs, h=13, w=13):
+    """Convert (y, x) observation to one-hot encoding."""
+    y, x = int(obs[0]), int(obs[1])
+    one_hot = np.zeros(h * w, dtype=np.float32)
+    idx = y * w + x
+    if 0 <= idx < len(one_hot):
+        one_hot[idx] = 1.0
+    return one_hot
+
 def visualize_policy_heatmap(policy_fn, save_path, title, num_episodes=50, success_only=False):
     env = MOFourRoomsEnv()
     layout = env.get_layout()
@@ -140,7 +108,9 @@ def visualize_policy_heatmap(policy_fn, save_path, title, num_episodes=50, succe
         
         while not done:
             if policy_fn:
-                action = policy_fn(obs)
+                # Convert raw (y, x) observation to one-hot for the policy
+                obs_onehot = obs_to_onehot(obs)
+                action = policy_fn(obs_onehot)
             else:
                 action = env.action_space.sample()
             
@@ -173,11 +143,74 @@ def visualize_policy_heatmap(policy_fn, save_path, title, num_episodes=50, succe
     plt.title(title)
     plt.axis('off')
     plt.savefig(save_path)
- 
- 
-if __name__ == "__main__":
-    def mock_policy(obs):
-        return int(np.random.choice([0,1,2,3], 1, p=[0, 0.9, 0, 0.1]))
- 
-    visualize_policy_heatmap(mock_policy, "Mock Policy", "test_heatmap.png", 1000)
-    visualize_policy_heatmap(mock_policy, "Mock Policy Success Only", "test_heatmap_success_only.png", 1000, success_only=True)
+    plt.close()
+
+
+def aggregate_policy_heatmaps(policy_fns, save_path, title, num_episodes_per_policy=100, success_only=True):
+    """
+    Args:
+        policy_fns: List of policy functions that take one-hot obs and return action
+        save_path: Path to save the combined heatmap
+        title: Title for the heatmap
+        num_episodes_per_policy: Number of episodes to run per policy
+        success_only: If True, only count trajectories that reach a goal
+    """
+    env = MOFourRoomsEnv()
+    layout = env.get_layout()
+    visitation_counts = np.zeros(layout.shape)
+    total_trajectories = 0
+    successful_trajectories = 0
+        
+    for policy_idx, policy_fn in enumerate(policy_fns):
+        for _ in range(num_episodes_per_policy):
+            obs = env.reset()
+            done = False
+            trajectory = []
+            
+            while not done:
+                y, x = int(obs[0]), int(obs[1])
+                trajectory.append((y, x))
+                
+                obs_onehot = obs_to_onehot(obs)
+                action = policy_fn(obs_onehot)
+                obs, reward, done, _ = env.step(action)
+            
+            y, x = int(obs[0]), int(obs[1])
+            trajectory.append((y, x))
+            
+            total_trajectories += 1
+            
+            if not success_only or reward == 1.0:
+                successful_trajectories += 1
+                for y, x in trajectory:
+                    visitation_counts[y, x] += 1
+            
+    print(f"Total trajectories: {total_trajectories}, Successful: {successful_trajectories}")
+    
+    # Generate heatmap
+    plt.figure(figsize=(8, 8))
+    
+    mask = layout
+    sns.heatmap(visitation_counts, mask=mask, cmap="Blues", cbar=True, square=True,
+                linewidths=0.5, linecolor='gray')
+
+    plt.imshow(layout, cmap="binary", alpha=0.3)
+    
+    colors = ['red', 'green', 'blue']
+    for i, goal in enumerate(env.goals):
+        plt.text(goal[1]+0.5, goal[0]+0.5, f"G{i+1}", color=colors[i], 
+                 ha='center', va='center', weight='bold', fontsize=12)
+    
+    # Add start position marker
+    plt.text(env.start_pos[1]+0.5, env.start_pos[0]+0.5, "S", color='black', 
+             ha='center', va='center', weight='bold', fontsize=12)
+        
+    plt.title(f"{title}\n({len(policy_fns)} policies, {successful_trajectories} successful trajectories)")
+    plt.axis('off')
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150)
+    plt.close()
+    
+    print(f"Heatmap saved to {save_path}")
+    return visitation_counts
+

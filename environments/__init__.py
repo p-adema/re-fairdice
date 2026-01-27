@@ -35,3 +35,39 @@ register(
     entry_point = 'environments.swimmer:SwimmerEnv',
     max_episode_steps=500,
 )
+
+register(
+    id='MO-FourRooms-v0',
+    entry_point='environments.four_rooms:MOFourRoomsEnv',
+    max_episode_steps=50,
+)
+
+register(
+    id='MO-FourRooms-v1',
+    entry_point='environments.four_rooms:MOFourRoomsEnv',
+    max_episode_steps=50,
+)
+
+register(
+    id='MO-RandomMOMDP-v0',
+    entry_point='environments.momdp:MOMDPEnv',
+    max_episode_steps=50,
+)
+
+register(
+    id='MO-Minecart-v0',
+    entry_point='environments.minecart_wrapper:make_minecart',
+    max_episode_steps=1000,
+)
+
+register(
+    id='MO-Minecart-Deterministic-v0',
+    entry_point='environments.minecart_wrapper:make_minecart_deterministic',
+    max_episode_steps=1000,
+)
+
+register(
+    id='MO-Minecart-RGB-v0',
+    entry_point='environments.minecart_wrapper:make_minecart_rgb',
+    max_episode_steps=1000,
+)

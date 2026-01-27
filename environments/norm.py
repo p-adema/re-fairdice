@@ -24,5 +24,20 @@ state_norm_params = {
     "MO-Walker2d-v2": {
         "mean": np.array([1.116750731036977, -0.3363452709970974, -0.3316850051534519, -0.7511427047318645, 0.19274933189219556, -0.6200324701020578, -0.16067687030963107, 0.5416847411428887, 1.7497760667774616, -0.06936457985904049, -0.11816332219093974, -0.15284182801522847, -0.2933337303981446, -0.05545796533726404, -0.2226723410943518, -0.08635534038498599, 0.1697440381383936, ]),
         "var": np.array([0.0034804486813955443, 0.04143357420205374, 0.08790632324221213, 0.3284840162691254, 0.3090904753830096, 0.09216643705539583, 0.04303564000987159, 0.10557799161138029, 1.3887131180405956, 0.2768508061213584, 7.215076808820878, 13.892186424782372, 26.37067211386862, 30.099564927710077, 10.967798122337761, 5.309070246017233, 22.205671104177277, ])
+    },
+    # Minecart environments: 7D observation [x, y, speed, sin(angle), cos(angle), ore1_fill, ore2_fill]
+    # All values are roughly in [-1, 1] range, use identity normalization
+    "MO-Minecart-v0": {
+        "mean": np.zeros(7),
+        "var": np.ones(7)
+    },
+    "MO-Minecart-Deterministic-v0": {
+        "mean": np.zeros(7),
+        "var": np.ones(7)
+    },
+    # For RGB version, normalization is handled differently (pixel values / 255)
+    "MO-Minecart-RGB-v0": {
+        "mean": np.zeros(1),  # Placeholder - RGB uses different normalization
+        "var": np.ones(1)
     }
 }
