@@ -91,14 +91,27 @@ def train_step(config, train_state: TrainState, batch, key: jax.random.PRNGKey):
         next_nu = nu_network(next_states)
         init_nu = nu_network(init_states)
         mu = mu_network() 
-        k = 1.0 / (mu+1e-8) 
         weighted_rewards = (rewards @ mu).reshape(-1, 1)
         e = (weighted_rewards + gamma * next_nu - nu)
         w = jax.nn.relu(f_derivative_inverse(e / beta, f_divergence))
         loss_1 = (1 - gamma) * jnp.mean(init_nu)
         masked_term = mask * (w * e - beta * f(w, f_divergence))
         loss_2 = jnp.sum(masked_term) / (jnp.sum(mask) + 1e-8)
-        loss_3 = jnp.sum(jnp.log(k) - mu * k)
+        # === START MODIFICATIONS FOR REPLICATION STUDY ===
+        if config.u_nonlinearity == "log":
+            # k = 1.0 / (mu + 1e-8)
+            # loss_3 = jnp.sum(jnp.log(k) - mu * k)
+            # Can be rewritten to:
+            loss_3 = -jnp.log(mu).sum()
+        elif config.u_nonlinearity == "piecewise-log-quadratic":
+            # u_i = -0.5 (x-2)² + 0.5
+            # (u_i')^-1 = -x + 2
+            k = jnp.where(mu < 1, -mu + 2, 1.0 / (mu + 1e-8))
+            u_k = jnp.where(k < 1, -0.5 * (k - 2)**2 + 0.5, jnp.log(k))
+            loss_3 = jnp.sum(u_k - mu * k)
+        else:
+            raise ValueError(f"Invalid {config.u_nonlinearity=}")
+        # === END MODIFICATIONS FOR REPLICATION STUDY ===
 
         def nu_scalar(x):
             return jnp.squeeze(nu_network(x), -1)  

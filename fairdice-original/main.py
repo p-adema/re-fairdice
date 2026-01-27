@@ -45,13 +45,15 @@ def main():
     parser.add_argument("--log_interval", type=int, default=1000, help="Log interval")
     parser.add_argument("--eval_episodes", type=int, default=10, help="Evaluation episodes")
     parser.add_argument("--wandb", type=bool, default=False, help="Use wandb for logging")
-    parser.add_argument("--save_path", type=str, default='./results', help="Path to save the model checkpoint")
+    parser.add_argument("--save_path", type=str, default="./results", help="Path to save the model checkpoint")
     parser.add_argument("--seed", type=int, default=0, help="Random seed")
     parser.add_argument("--tag", type=str, default="", help="Tag for the experiment")
     parser.add_argument("--loss_kind", type=str, choices=["wrong-broadcast", "behaviour-cloning", "fixed-fairdice"], default="wrong-broadcast", help="Loss function for training the model")
+    parser.add_argument("--u_nonlinearity", type=str, choices=["log", "piecewise-log-quadratic"], default="log", help="Nonlinearity u_i")
 
-    args, unknown = parser.parse_known_args()
+    args = parser.parse_args()
     config = SimpleNamespace(**vars(args))
+    print(config)
     data_path = f"./data/{config.env_name}/{config.env_name}_50000_{config.quality}_{config.preference_dist}.pkl"
     with open(data_path, "rb") as f:
         trajs = pickle.load(f)

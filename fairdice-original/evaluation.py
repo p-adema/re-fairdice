@@ -40,10 +40,9 @@ def evaluate_policy(config, policy, env, save_dir, num_episodes=3, max_steps=500
             raw_rewards_list.append(raw_rewards)
             discounted_raw_rewards = raw_rewards * (config.gamma ** steps)
             discounted_raw_rewards_list.append(discounted_raw_rewards)
-            if config.normalize_reward:
-                normalized_rewards = min_max_normalization(raw_rewards, config.reward_min, config.reward_max)
-            else:
-                normalized_rewards = raw_rewards
+            # The original code only normalised `normalized_rewards` when the flag was
+            # set, but this makes no sense.
+            normalized_rewards = min_max_normalization(raw_rewards, config.reward_min, config.reward_max)
             normalized_rewards_list.append(normalized_rewards)
             discounted_normalized_rewards = normalized_rewards * (config.gamma ** steps)
             discounted_normalized_rewards_list.append(discounted_normalized_rewards)
