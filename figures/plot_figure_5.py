@@ -3,7 +3,7 @@ import matplotlib.gridspec as gridspec
 import pandas as pd
 import numpy as np
 import os
-
+import json
 def get_pareto_frontier(x, y):
     # Sort by x descending
     sorted_indices = np.argsort(x)[::-1]
@@ -48,6 +48,9 @@ def plot_figure_5():
     }
 
     base_path = "/home/scur0076/PEDA/figures"
+    
+    with open(os.path.join(base_path, 'scores.json'), 'r') as f:
+        scores_data = json.load(f)
     
 
     handles = []
@@ -114,6 +117,19 @@ def plot_figure_5():
                 y_min_limit = 0
 
 
+            score_env_key = col_env.replace("MO-", "") + "-v2"
+            score_type_key = "expert" if row_type == "Expert" else "amateur"
+
+            try:
+                raw_rerun = scores_data[score_type_key][score_env_key]["Raw_Rerun"]
+            except KeyError:
+                raw_rerun = None
+
+            try:
+                raw_fixed = scores_data[score_type_key][score_env_key]["Raw_Fixed"]
+            except KeyError:
+                raw_fixed = None
+
             current_env = env_map[col_env]
             current_type = type_map[row_type]
             data_dir = os.path.join(base_path, current_env, current_type)
@@ -173,42 +189,25 @@ def plot_figure_5():
                         ax.fill_between(fill_x, fill_y, y2=y_min_limit, color=color, alpha=0.1, zorder=1)
 
 
-            fairdice_point = None
-            if "Hopper" in col_env:
-                if "Expert" == row_type:
-                    fairdice_point = [3341.14809356, 4379.18419087]
-                elif "Amateur" == row_type:
-                    fairdice_point = [3220.94064431, 4394.17596932]
-            elif "Walker" in col_env:
-                if "Expert" == row_type:
-                    fairdice_point = [1638.11164863, 2037.48784729]
-                elif "Amateur" == row_type:
-                    fairdice_point = [2167.71380409, 1227.71647041]
-            elif "Ant" in col_env:
-                if "Expert" == row_type:
-                    fairdice_point = [1970.57044745, 1907.05968842]
-                elif "Amateur" == row_type:
-                    fairdice_point = [1594.07736887, 2042.81297835]
-            elif "HalfCheetah" in col_env:
-                if "Expert" == row_type:
-                    fairdice_point = [1476.61236919, 2354.9468137]
-                elif "Amateur" == row_type:
-                    fairdice_point = [1711.65579224, 2293.03646119]
-            elif "Swimmer" in col_env:
-                if "Expert" == row_type:
-                    fairdice_point = [87.84733536, 140.21745429]
-                elif "Amateur" == row_type:
-                    fairdice_point = [41.50616261, 149.63499322]
-
-            if fairdice_point:
-                fd_scat = ax.scatter(fairdice_point[0], fairdice_point[1], color='#d62728', s=250, marker='o', zorder=10, label='FairDICE', edgecolors='white', linewidths=2.0)
-                if 'FairDICE' not in seen_labels:
+            if raw_rerun:
+                ax.scatter(raw_rerun[0], raw_rerun[1], color='#d62728', s=250, marker='o', zorder=10, label='FairDICE (Rerun)', edgecolors='white', linewidths=2.0)
+                if 'FairDICE (Rerun)' not in seen_labels:
                     import matplotlib.lines as mlines
                     fd_line = mlines.Line2D([], [], color='#d62728', marker='o', linestyle='None',
-                                          markersize=15, label='FairDICE', markeredgecolor='white', markeredgewidth=2.0)
+                                          markersize=15, label='FairDICE (Rerun)', markeredgecolor='white', markeredgewidth=2.0)
                     handles.append(fd_line)
-                    labels.append('FairDICE')
-                    seen_labels.add('FairDICE')
+                    labels.append('FairDICE (Rerun)')
+                    seen_labels.add('FairDICE (Rerun)')
+
+            if raw_fixed:
+                ax.scatter(raw_fixed[0], raw_fixed[1], color='#9467bd', s=250, marker='o', zorder=10, label='FairDICE (Fixed)', edgecolors='white', linewidths=2.0)
+                if 'FairDICE (Fixed)' not in seen_labels:
+                    import matplotlib.lines as mlines
+                    fd_line_fixed = mlines.Line2D([], [], color='#9467bd', marker='o', linestyle='None',
+                                          markersize=15, label='FairDICE (Fixed)', markeredgecolor='white', markeredgewidth=2.0)
+                    handles.append(fd_line_fixed)
+                    labels.append('FairDICE (Fixed)')
+                    seen_labels.add('FairDICE (Fixed)')
 
 
             ax.grid(True, linestyle='--', alpha=0.5)
@@ -224,7 +223,7 @@ def plot_figure_5():
                 ax.set_xlabel(xlabel, fontsize=18)
 
 
-    fig.legend(handles, labels, loc='lower center', ncol=4, fontsize=20, bbox_to_anchor=(0.5, 0.02))
+    fig.legend(handles, labels, loc='lower center', ncol=5, fontsize=20, bbox_to_anchor=(0.5, 0.02))
 
     plt.tight_layout(rect=[0, 0.08, 1, 1], w_pad=3, h_pad=3)
     output_path = os.path.join(base_path, 'replication_figure_5.png')

@@ -6,11 +6,12 @@ import sys
 import os
 
 
+import json
+
 try:
-    from scores import scores
+    pass
 except ImportError:
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-    from scores import scores
 
 def plot_combined_figure_6():
 
@@ -25,8 +26,12 @@ def plot_combined_figure_6():
         ('rvs', '#ff7f0e', '^', 'MORvS(P)')
     ]
 
+    base_path = "/home/scur0076/PEDA/figures"
+    with open(os.path.join(base_path, 'scores.json'), 'r') as f:
+        scores_data = json.load(f)
 
-    def setup_returns_plot(idx, title, dataset_type, fd_point):
+
+    def setup_returns_plot(idx, title, dataset_type, rerun_point, fixed_point):
         ax = fig.add_subplot(1, 4, idx, projection='3d')
         ax.set_title(title, fontsize=18)
         
@@ -42,7 +47,7 @@ def plot_combined_figure_6():
         ax.set_yticks([0, 1000, 2000, 3000, 4000])
         ax.set_zticks([0, 1000, 2000, 3000])
         
-        ax.view_init(elev=20, azim=80)
+        ax.view_init(elev=20, azim=67)
 
 
         for m, color, marker, _ in methods_config:
@@ -51,14 +56,14 @@ def plot_combined_figure_6():
                 ax.scatter(points[:, 0], points[:, 1], points[:, 2], c=color, marker=marker, s=30, alpha=0.4, depthshade=False, linewidths=0)
 
 
-        ax.scatter(*fd_point, c='#d62728', marker='o', s=60, depthshade=False, edgecolors='white', linewidths=2)
-        ax.text(fd_point[0], fd_point[1], fd_point[2] + 2000, 
-                f"({fd_point[0]:.1f}, {fd_point[1]:.1f}, {fd_point[2]:.1f})", 
-                color='#d62728', fontsize=12,
-                bbox=dict(facecolor='white', edgecolor='#d62728', boxstyle='round,pad=0.3'))
+        if rerun_point is not None:
+            ax.scatter(*rerun_point, c='#d62728', marker='o', s=60, depthshade=False, edgecolors='white', linewidths=2)
+
+        if fixed_point is not None:
+             ax.scatter(*fixed_point, c='#9467bd', marker='o', s=60, depthshade=False, edgecolors='white', linewidths=2)
         
 
-    def setup_simplex_plot(idx, title, dataset_type, z_min, target_score):
+    def setup_simplex_plot(idx, title, dataset_type, z_min, rerun_score, fixed_score):
         ax = fig.add_subplot(1, 4, idx, projection='3d')
         ax.set_title(title, fontsize=18)
         ax.set_zlabel("NSW Score", fontsize=14, labelpad=10)
@@ -71,10 +76,15 @@ def plot_combined_figure_6():
             ax.plot([v1[0], v2[0]], [v1[1], v2[1]], [z_min, z_min], 'k-', lw=1, alpha=0.3)
 
 
-        if target_score:
-            ax.plot_trisurf([-1, 1, 0], [-0.5, -0.5, 1.0], [target_score]*3, color='#d62728', alpha=0.3, shade=False)
-            ax.text(0, 1.0, target_score + 2.5, f"{target_score:.2f}", color='#d62728', fontsize=12,
+        if rerun_score:
+            ax.plot_trisurf([-1, 1, 0], [-0.5, -0.5, 1.0], [rerun_score]*3, color='#d62728', alpha=0.3, shade=False)
+            ax.text(-0.2, 1.0, rerun_score + 2.0, f"{rerun_score:.2f}", color='#d62728', fontsize=12,
                     bbox=dict(facecolor='white', edgecolor='#d62728', boxstyle='round,pad=0.3'))
+
+        if fixed_score:
+            ax.plot_trisurf([-1, 1, 0], [-0.5, -0.5, 1.0], [fixed_score]*3, color='#9467bd', alpha=0.3, shade=False)
+            ax.text(-0.2, 1.0, fixed_score - 2.0, f"{fixed_score:.2f}", color='#9467bd', fontsize=12,
+                    bbox=dict(facecolor='white', edgecolor='#9467bd', boxstyle='round,pad=0.3'))
 
 
         for m, color, marker, _ in methods_config:
@@ -92,22 +102,31 @@ def plot_combined_figure_6():
         ax.text2D(0.5, 0.05, "Preference Weight Simplex", transform=ax.transAxes, ha='center', fontsize=14)
         ax.view_init(elev=20, azim=45)
 
-    setup_returns_plot(1, "Expert", "expert", np.array([1149.80613158, 1125.92841047, 1317.32675833]))
+    setup_returns_plot(1, "Expert", "expert", 
+                       np.array(scores_data['expert']['Hopper-v3']['Raw_Rerun']),
+                       np.array(scores_data['expert']['Hopper-v3']['Raw_Fixed']))
     
-    setup_returns_plot(2, "Amateur", "amateur", np.array([2368.64291278, 2945.32947587, 1975.69500442]))
+    setup_returns_plot(2, "Amateur", "amateur", 
+                       np.array(scores_data['amateur']['Hopper-v3']['Raw_Rerun']),
+                       np.array(scores_data['amateur']['Hopper-v3']['Raw_Fixed']))
     
-    setup_simplex_plot(3, "Expert", "expert", z_min=8, target_score=scores.get('Hopper-v3/expert/Rerun/1.0', 0))
+    setup_simplex_plot(3, "Expert", "expert", z_min=8, 
+                       rerun_score=scores_data['expert']['Hopper-v3']['Rerun'],
+                       fixed_score=scores_data['expert']['Hopper-v3']['Fixed'])
     
-    setup_simplex_plot(4, "Amateur", "amateur", z_min=6, target_score=scores.get('Hopper-v3/amateur/Rerun/1.0', 0))
+    setup_simplex_plot(4, "Amateur", "amateur", z_min=6, 
+                       rerun_score=scores_data['amateur']['Hopper-v3']['Rerun'],
+                       fixed_score=scores_data['amateur']['Hopper-v3']['Fixed'])
 
 
     from matplotlib.lines import Line2D
     legend_elements = [
         Line2D([0], [0], marker=m[2], color='w', label=m[3], markerfacecolor=m[1], markersize=12) for m in methods_config
     ]
-    legend_elements.append(Line2D([0], [0], marker='o', color='w', label='FairDICE', markerfacecolor='#d62728', markersize=12))
+    legend_elements.append(Line2D([0], [0], marker='o', color='w', label='FairDICE (Rerun)', markerfacecolor='#d62728', markersize=12))
+    legend_elements.append(Line2D([0], [0], marker='o', color='w', label='FairDICE (Fixed)', markerfacecolor='#9467bd', markersize=12))
     
-    fig.legend(handles=legend_elements, loc='lower center', ncol=4, bbox_to_anchor=(0.5, 0.0), fontsize=16)
+    fig.legend(handles=legend_elements, loc='lower center', ncol=5, bbox_to_anchor=(0.5, 0.0), fontsize=16)
 
     output_path = "/home/scur0076/PEDA/figures/replication_figure_6.png"
     plt.savefig(output_path, dpi=300, bbox_inches='tight')

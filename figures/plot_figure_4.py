@@ -3,7 +3,7 @@ import matplotlib.gridspec as gridspec
 import pandas as pd
 import numpy as np
 import os
-from scores import scores
+import json
 
 def plot_figure_4():
     fig, axes = plt.subplots(2, 5, figsize=(25, 10), sharex=True)
@@ -24,6 +24,9 @@ def plot_figure_4():
     }
 
     base_path = "/home/scur0076/PEDA/figures"
+    
+    with open(os.path.join(base_path, 'scores.json'), 'r') as f:
+        scores_data = json.load(f)
 
     handles = []
     labels = []
@@ -96,8 +99,15 @@ def plot_figure_4():
             
             score_type_key = "expert" if row_type == "Expert" else "amateur"
             
-            score_key = f"{score_env_key}/{score_type_key}/Rerun/1.0"
-            baseline_val = scores.get(score_key)
+            try:
+                rerun_val = scores_data[score_type_key][score_env_key]["Rerun"]
+            except KeyError:
+                rerun_val = None
+
+            try:
+                fixed_val = scores_data[score_type_key][score_env_key]["Fixed"]
+            except KeyError:
+                fixed_val = None
 
             if "Hopper" in col_env:
                 if "Expert" == row_type:
@@ -135,14 +145,23 @@ def plot_figure_4():
                     ax.set_ylim(11, 12)
                     ax.set_yticks([11.0, 11.2, 11.4, 11.6, 11.8, 12.0])
 
-            if baseline_val is not None:
-                line4 = ax.axhline(y=baseline_val, color='#d62728', linestyle='--', linewidth=2.5, label='FairDICE')
-                if 'FairDICE' not in seen_labels:
+            if rerun_val is not None:
+                line4 = ax.axhline(y=rerun_val, color='#d62728', linestyle='--', linewidth=2.5, label='FairDICE (Rerun)')
+                if 'FairDICE (Rerun)' not in seen_labels:
                     handles.append(line4)
-                    labels.append('FairDICE')
-                    seen_labels.add('FairDICE')
+                    labels.append('FairDICE (Rerun)')
+                    seen_labels.add('FairDICE (Rerun)')
             else:
-                print(f"Warning: Baseline value not found for key: {score_key}")
+                print(f"Warning: Rerun Baseline value not found for: {score_type_key}/{score_env_key}")
+
+            if fixed_val is not None:
+                line5 = ax.axhline(y=fixed_val, color='#9467bd', linestyle=':', linewidth=3.5, label='FairDICE (Fixed)')
+                if 'FairDICE (Fixed)' not in seen_labels:
+                    handles.append(line5)
+                    labels.append('FairDICE (Fixed)')
+                    seen_labels.add('FairDICE (Fixed)')
+            else:
+                 print(f"Warning: Fixed Baseline value not found for: {score_type_key}/{score_env_key}")
 
             ax.grid(True, linestyle='--', alpha=0.5)
             ax.tick_params(axis='both', labelsize=15)
@@ -156,7 +175,7 @@ def plot_figure_4():
     fig.supylabel("Avg Nash Social Welfare", fontsize=25, x=0.01)
     fig.supxlabel("Preference Weight ([1.0, 0.0] -> [0.0, 1.0])", fontsize=25, y=0.10)
 
-    fig.legend(handles, labels, loc='lower center', ncol=4, fontsize=25, bbox_to_anchor=(0.5, 0.01))
+    fig.legend(handles, labels, loc='lower center', ncol=5, fontsize=25, bbox_to_anchor=(0.5, 0.01))
 
     plt.tight_layout(rect=[0.02, 0.1, 1, 1], h_pad=3, w_pad=3)
     
