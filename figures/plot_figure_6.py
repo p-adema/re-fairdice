@@ -76,13 +76,24 @@ def plot_combined_figure_6():
             ax.plot([v1[0], v2[0]], [v1[1], v2[1]], [z_min, z_min], 'k-', lw=1, alpha=0.3)
 
 
-        if rerun_score:
+        if rerun_score > fixed_score:
+            # Fixed is lower, plot full
+            ax.plot_trisurf([-1, 1, 0], [-0.5, -0.5, 1.0], [fixed_score]*3, color='#9467bd', alpha=0.3, shade=False)
+            ax.text(-0.2, 1.0, fixed_score - 2.0, f"{fixed_score:.2f}", color='#9467bd', fontsize=12,
+                    bbox=dict(facecolor='white', edgecolor='#9467bd', boxstyle='round,pad=0.3'))
+            
+            # Rerun is higher, plot cut (left 3/4)
+            ax.plot_trisurf([-1, 0.5, 0], [-0.5, -0.5, 1.0], [rerun_score]*3, color='#d62728', alpha=0.3, shade=False)
+            ax.text(-0.2, 1.0, rerun_score + 2.0, f"{rerun_score:.2f}", color='#d62728', fontsize=12,
+                    bbox=dict(facecolor='white', edgecolor='#d62728', boxstyle='round,pad=0.3'))
+        else:
+            # Rerun is lower (or equal), plot full
             ax.plot_trisurf([-1, 1, 0], [-0.5, -0.5, 1.0], [rerun_score]*3, color='#d62728', alpha=0.3, shade=False)
             ax.text(-0.2, 1.0, rerun_score + 2.0, f"{rerun_score:.2f}", color='#d62728', fontsize=12,
                     bbox=dict(facecolor='white', edgecolor='#d62728', boxstyle='round,pad=0.3'))
-
-        if fixed_score:
-            ax.plot_trisurf([-1, 1, 0], [-0.5, -0.5, 1.0], [fixed_score]*3, color='#9467bd', alpha=0.3, shade=False)
+            
+            # Fixed is higher, plot cut (left 3/4)
+            ax.plot_trisurf([-1, 0.5, 0], [-0.5, -0.5, 1.0], [fixed_score]*3, color='#9467bd', alpha=0.3, shade=False)
             ax.text(-0.2, 1.0, fixed_score - 2.0, f"{fixed_score:.2f}", color='#9467bd', fontsize=12,
                     bbox=dict(facecolor='white', edgecolor='#9467bd', boxstyle='round,pad=0.3'))
 
