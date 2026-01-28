@@ -50,6 +50,7 @@ def main():
     parser.add_argument("--tag", type=str, default="", help="Tag for the experiment")
     parser.add_argument("--loss_kind", type=str, choices=["wrong-broadcast", "behaviour-cloning", "fixed-fairdice"], default="wrong-broadcast", help="Loss function for training the model")
     parser.add_argument("--u_nonlinearity", type=str, choices=["log", "piecewise-log-quadratic"], default="log", help="Nonlinearity u_i")
+    parser.add_argument("--discrete", type=bool, default=False, help="Discrete policy actions")
 
     args = parser.parse_args()
     config = SimpleNamespace(**vars(args))
@@ -61,14 +62,17 @@ def main():
         
     env = gym.make(config.env_name)
     config.state_dim = env.observation_space.shape[0]
-    config.action_dim = env.action_space.shape[0]
     config.reward_dim = env.obj_dim
     config.state_mean = state_norm_params[config.env_name]["mean"]
     config.state_std = np.sqrt(state_norm_params[config.env_name]["var"])
-    config.ACTION_HIGH = env.action_space.high
-    config.ACTION_LOW  = env.action_space.low
-    config.ACTION_SCALE = (config.ACTION_HIGH - config.ACTION_LOW) / 2.0  
-    config.ACTION_BIAS  = (config.ACTION_HIGH + config.ACTION_LOW) / 2.0 
+    if config.discrete:
+        config.action_dim = env.action_space.n
+    else:
+        config.action_dim = env.action_space.shape[0]
+        config.ACTION_HIGH = env.action_space.high
+        config.ACTION_LOW = env.action_space.low
+        config.ACTION_SCALE = (config.ACTION_HIGH - config.ACTION_LOW) / 2.0
+        config.ACTION_BIAS = (config.ACTION_HIGH + config.ACTION_LOW) / 2.0
     
     reward_min, reward_max = None, None        
     for traj in trajs:
@@ -92,7 +96,8 @@ def main():
             traj["rewards"] = traj["raw_rewards"]
         traj["states"] = normalization(traj['observations'], config.state_mean, config.state_std)
         traj['next_states'] = normalization(traj['next_observations'], config.state_mean, config.state_std)
-        traj['actions'] = (traj['actions'] - config.ACTION_BIAS) / config.ACTION_SCALE
+        if not config.discrete:
+            traj['actions'] = (traj['actions'] - config.ACTION_BIAS) / config.ACTION_SCALE
         traj["init_observations"] = np.tile(traj['observations'][0], (traj['observations'].shape[0], 1))
         traj["init_states"] = np.tile(traj['states'][0], (traj['states'].shape[0], 1))
 
@@ -109,7 +114,7 @@ def main():
         
     for key, value in batch.items():
         print(key, value.shape)
-    
+
     config.hidden_dims = [config.hidden_dim] * config.num_layers
 
 

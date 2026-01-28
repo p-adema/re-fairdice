@@ -35,3 +35,9 @@ register(
     entry_point = 'environments.swimmer:SwimmerEnv',
     max_episode_steps=500,
 )
+
+register(
+    id='MO-GroupPolicy-v1',
+    entry_point='environments.group_policy:GroupPolicyEnv',
+    max_episode_steps=500,
+)

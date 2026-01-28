@@ -35,28 +35,32 @@ class MLP(nnx.Module):
     
     def __call__(self, x):
         return self.layer(x)
-    
-class DiscretePolicy(nnx.Module):
-    def __init__(self,
-                 input_dim,
-                 hidden_dim,
-                 action_dim,
-                 rngs: nnx.Rngs = nnx.Rngs(0)):
-        
-        self.mlp_layer = MLP(input_dim, hidden_dim, rngs=rngs)
-        self.layer = nnx.Linear(hidden_dim, action_dim, rngs=rngs)
-        
-
-    def __call__(self, inputs):
-        x = self.mlp_layer(inputs)
-        
-        logits = self.layer(x)
-        probs = nnx.softmax(logits, axis=-1)
-        return logits, probs
 
 import tensorflow_probability.substrates.jax as tfp
 tfd = tfp.distributions
 tfb = tfp.bijectors
+
+class DiscretePolicy(nnx.Module):
+    def __init__(self,
+                 input_dim,
+                 hidden_dims,
+                 action_dim,
+                 activation=nnx.relu,
+                 temperature=1.0,
+                 rngs: nnx.Rngs = nnx.Rngs(0),
+                 layer_norm: bool = False):
+
+        self.mlp_layer = MLP(input_dim, hidden_dims[-1], hidden_dims[:-1], activation=activation, rngs = rngs, activate_final=True, layer_norm=layer_norm)
+        self.layer = nnx.Linear(hidden_dims[-1], action_dim, rngs=rngs)
+        self.temperature = temperature
+        
+
+    def __call__(self, inputs):
+        x = self.mlp_layer(inputs)
+        logits = self.layer(x) * self.temperature
+        return tfd.Categorical(logits=logits)
+
+
 
 LOG_STD_MIN = -5.0
 LOG_STD_MAX = 2.0

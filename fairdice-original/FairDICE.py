@@ -2,7 +2,7 @@ from collections import namedtuple
 import jax
 import jax.numpy as jnp
 from flax import nnx
-from policy import GaussianPolicy, MuNetwork
+from policy import GaussianPolicy, MuNetwork, DiscretePolicy
 from critic import Critic
 from divergence import f, FDivergence, f_derivative_inverse
 import orbax.checkpoint as orbax
@@ -24,16 +24,28 @@ import optax
 def init_train_state(config) -> TrainState:
     rngs = nnx.Rngs(config.seed)
 
-    policy = GaussianPolicy(
-        input_dim=config.state_dim,
-        hidden_dims=config.hidden_dims,
-        action_dim=config.action_dim,
-        activation=nnx.relu,
-        temperature=config.temperature,
-        tanh_squash_distribution=config.tanh_squash_distribution,
-        rngs=rngs,
-        layer_norm=config.layer_norm
-    )
+    if config.discrete:
+        assert not config.tanh_squash_distribution, "Not supported with discrete"
+        policy = DiscretePolicy(
+            input_dim=config.state_dim,
+            hidden_dims=config.hidden_dims,
+            action_dim=config.action_dim,
+            activation=nnx.relu,
+            temperature=config.temperature,
+            rngs=rngs,
+            layer_norm=config.layer_norm
+        )
+    else:
+        policy = GaussianPolicy(
+            input_dim=config.state_dim,
+            hidden_dims=config.hidden_dims,
+            action_dim=config.action_dim,
+            activation=nnx.relu,
+            temperature=config.temperature,
+            tanh_squash_distribution=config.tanh_squash_distribution,
+            rngs=rngs,
+            layer_norm=config.layer_norm
+        )
     
     policy_tx = optax.chain(
             optax.scale_by_adam(),
@@ -136,7 +148,6 @@ def train_step(config, train_state: TrainState, batch, key: jax.random.PRNGKey):
     
     def policy_loss_fn(policy):
         dist = policy(states)
-        log_probs = dist.log_prob(batch.actions)
         weighted_rewards = (rewards @ mu).reshape(-1, 1)
         nu_val = nu_network(states)
         next_nu = nu_network(next_states)
@@ -147,12 +158,17 @@ def train_step(config, train_state: TrainState, batch, key: jax.random.PRNGKey):
         stable_w = stable_w / (jnp.mean(stable_w) + 1e-8)
 
         # === START MODIFICATIONS FOR REPLICATION STUDY ===
+        if config.discrete:
+            log_probs = dist.log_prob(batch.actions.reshape(-1))
+        else:
+            log_probs = dist.log_prob(batch.actions)
+
         if config.loss_kind == "wrong-broadcast":
             policy_loss = -(mask * stable_w * log_probs).sum() / (jnp.sum(mask) + 1e-8)
         elif config.loss_kind == "behaviour-cloning":
             policy_loss = -log_probs.sum()
         elif config.loss_kind == "fixed-fairdice":
-            policy_loss = -(mask.reshape(-1) * stable_w.reshape(-1) * log_probs).sum() / (jnp.sum(mask) + 1e-8)
+            policy_loss = -(mask.reshape(-1) * stable_w.reshape(-1) * log_probs.reshape(-1)).sum() / (jnp.sum(mask) + 1e-8)
         else:
             raise ValueError(f"Invalid {config.loss_kind=}")
         # === END MODIFICATIONS FOR REPLICATION STUDY ===

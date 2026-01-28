@@ -15,7 +15,11 @@ def evaluate_policy(config, policy, env, save_dir, num_episodes=3, max_steps=500
     @jax.jit
     def select_action(observation):
         dist = policy(observation)
-        action = dist.mean() # deterministic action
+        # deterministic action
+        if config.discrete:
+            action = dist.mode()
+        else:
+            action = dist.mean()
         return action.flatten()
 
     for iter in range(num_episodes):
@@ -31,7 +35,9 @@ def evaluate_policy(config, policy, env, save_dir, num_episodes=3, max_steps=500
         
         while not done and steps < max_steps:
             s_t = normalization(state, config.state_mean, config.state_std)
-            action = (select_action(s_t)* config.ACTION_SCALE + config.ACTION_BIAS).astype(np.float32)
+            action = select_action(s_t)
+            if not config.discrete:
+                action = (action * config.ACTION_SCALE + config.ACTION_BIAS).astype(np.float32)
             state, _, done, info= env.step(action)
             
 
