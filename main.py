@@ -8,7 +8,7 @@ from environments.four_rooms import visualize_policy_heatmap
 import pickle
 import numpy as np
 from collections import defaultdict
-from utils import normalization, min_max_normalization, social_welfare
+from utils import normalization, min_max_normalization, normalize_rewards, social_welfare
 from buffer import Buffer
 import argparse
 from types import SimpleNamespace
@@ -206,6 +206,9 @@ def main():
     parser.add_argument("--preference_dist", type=str, choices=["uniform", "wide", "narrow"], default="uniform", help="Preference distribution")
     parser.add_argument("--max_seq_len", type=int, default=500, help="Max sequence length in trajectories")
     parser.add_argument("--normalize_reward", type=bool, default=False, help="Whether to normalize reward") # Default changed to False for discrete usually
+    parser.add_argument("--reward_norm", type=str, default="minmax",
+                        choices=["minmax", "zscore", "return", "none"],
+                        help="Reward normalization mode used for training when --normalize_reward is True")
     parser.add_argument("--env_name", type=str, default="MO-Hopper-v2", help="Environment name")
     parser.add_argument("--mode", type=str, default="train", choices=["train", "eval"], help="Running mode: 'train' or 'eval'")
     parser.add_argument("--load_path", type=str, default=None, help="Path to a saved model checkpoint (for eval mode).")
@@ -303,27 +306,54 @@ def main():
             config.state_std = np.std(all_obs, axis=0) + 1e-8
     
     # Calculate Reward Statistics
-    reward_min, reward_max = None, None        
+    reward_min, reward_max = None, None
+    reward_sum = None
+    reward_sq_sum = None
+    reward_count = 0
+    returns = []
     for traj in trajs:
-        r = traj["raw_rewards"]           
-
-        r_min = r.min(axis=0)                  
+        r = traj["raw_rewards"]
+        r_min = r.min(axis=0)
         r_max = r.max(axis=0)
 
-        if reward_min is None:                 
+        if reward_min is None:
             reward_min, reward_max = r_min, r_max
-        else:                                  
+        else:
             reward_min = np.minimum(reward_min, r_min)
             reward_max = np.maximum(reward_max, r_max)
+
+        returns.append(r.sum(axis=0))
+        reward_count += r.shape[0]
+        reward_sum = r.sum(axis=0) if reward_sum is None else reward_sum + r.sum(axis=0)
+        reward_sq_sum = (r ** 2).sum(axis=0) if reward_sq_sum is None else reward_sq_sum + (r ** 2).sum(axis=0)
+
+    reward_mean = reward_sum / max(reward_count, 1)
+    reward_var = reward_sq_sum / max(reward_count, 1) - reward_mean ** 2
+    reward_std = np.sqrt(np.maximum(reward_var, 0.0))
+    returns = np.array(returns) if returns else np.zeros((0, 0))
+    return_mean = returns.mean(axis=0) if returns.size else np.zeros(0)
+    reward_return_scale = 1.0 / np.maximum(return_mean, 1e-8)
+
     config.reward_min = reward_min
     config.reward_max = reward_max
+    config.reward_mean = reward_mean
+    config.reward_std = reward_std
+    config.reward_return_scale = reward_return_scale
 
     # Normalize Data
     use_cnn = getattr(config, 'use_cnn', False)
     
     for traj in trajs:
         if config.normalize_reward:
-            traj["rewards"] = min_max_normalization(traj["raw_rewards"], reward_min, reward_max)
+            traj["rewards"] = normalize_rewards(
+                traj["raw_rewards"],
+                mode=getattr(config, "reward_norm", "minmax"),
+                reward_min=config.reward_min,
+                reward_max=config.reward_max,
+                reward_mean=config.reward_mean,
+                reward_std=config.reward_std,
+                reward_return_scale=config.reward_return_scale,
+            )
         else:
             traj["rewards"] = traj["raw_rewards"]
         

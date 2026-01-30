@@ -49,8 +49,14 @@ register(
 )
 
 register(
+    id='MO-FourRooms-v2',
+    entry_point='environments.four_rooms:MOFourRoomsEnv',
+    max_episode_steps=50,
+)
+
+register(
     id='MO-RandomMOMDP-v0',
-    entry_point='environments.momdp:MOMDPEnv',
+    entry_point='environments.mo_mdp:MOMDPEnv',
     max_episode_steps=50,
 )
 

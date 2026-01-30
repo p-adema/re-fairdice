@@ -1,5 +1,6 @@
 from flax import nnx
 import jax.numpy as jnp
+import jax.nn as jnn
 
 class MuNetwork(nnx.Module):
     def __init__(self,
@@ -7,7 +8,7 @@ class MuNetwork(nnx.Module):
         self.mu = nnx.Param(jnp.full((config.reward_dim,), 1.0))
         
     def __call__(self):
-        return self.mu * 1.0
+        return self.mu.value * 1.0
 
 class MLP(nnx.Module):
     def __init__(self, din, dout = 1, hidden_dims = [256, 256], activation = nnx.relu, rngs: nnx.Rngs = nnx.Rngs(0), activate_final: bool = False, dropout_rate: float = 0.0, layer_norm: bool = False):
@@ -159,9 +160,9 @@ class CNNEncoder(nnx.Module):
     def __init__(self, 
                  feature_dim: int = 256,
                  rngs: nnx.Rngs = nnx.Rngs(0)):
-        # Input: (batch, 480, 480, 3)
+        # Input: (batch, 480, 480, 1)
         self.conv1 = nnx.Conv(
-            in_features=3, out_features=32,
+            in_features=1, out_features=32,
             kernel_size=(8, 8), strides=(4, 4),
             padding='VALID',
             rngs=rngs,

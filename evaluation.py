@@ -1,11 +1,12 @@
 from tqdm import tqdm
 import numpy as np
 import jax
-from utils import normalization, min_max_normalization
+import jax.random as jrandom
+from utils import normalization, min_max_normalization, normalize_rewards
 import os
 import wandb
 
-def evaluate_policy(config, policy, env, save_dir, num_episodes=3, max_steps=500, t_env=None, key=jax.random.PRNGKey(0)):
+def evaluate_policy(config, policy, env, save_dir, num_episodes=3, max_steps=500, t_env=None, key=jax.random.PRNGKey(0), return_episode_returns=False):
     policy.eval()
     raw_returns = []
     normalized_returns = []
@@ -14,18 +15,24 @@ def evaluate_policy(config, policy, env, save_dir, num_episodes=3, max_steps=500
     
     use_cnn = getattr(config, 'use_cnn', False)
     
-    @jax.jit
+    # Use a mutable counter for sampling
+    step_counter = [0]
+    debug_printed = [False]
+    
     def select_action(observation):
         if use_cnn:
-            # (H, W, C) -> (1, H, W, C)
             obs_batched = observation[None, ...]
         else:
             obs_batched = observation[None, :]
         dist = policy(obs_batched)
         if config.is_discrete:
-            action = dist.mode()[0]  # argmax sampling
+            # Use step counter to vary the random key
+            step_counter[0] += 1
+            subkey = jrandom.PRNGKey(step_counter[0])
+            
+            action = dist.sample(seed=subkey)[0]
         else:
-            action = dist.mean().flatten()  # deterministic action for continuous
+            action = dist.mean().flatten()
         return action
     
     def preprocess_state(state):
@@ -37,6 +44,8 @@ def evaluate_policy(config, policy, env, save_dir, num_episodes=3, max_steps=500
         else:
             return normalization(state, config.state_mean, config.state_std)
 
+    action_counts = {}  # Debug: track action distribution
+    
     for iter in range(num_episodes):
         try:
             env.seed(iter)
@@ -58,6 +67,8 @@ def evaluate_policy(config, policy, env, save_dir, num_episodes=3, max_steps=500
             s_t = preprocess_state(state)
             if config.is_discrete:
                 action = int(select_action(s_t))
+                # Track action distribution
+                action_counts[action] = action_counts.get(action, 0) + 1
             else:
                 action = (select_action(s_t) * config.ACTION_SCALE + config.ACTION_BIAS).astype(np.float32)
             
@@ -71,11 +82,18 @@ def evaluate_policy(config, policy, env, save_dir, num_episodes=3, max_steps=500
         
 
             raw_rewards = info['obj']
+            # If ignoring fuel, only use first 2 objectives (ore1, ore2)
+            if getattr(config, 'ignore_fuel', False):
+                raw_rewards = raw_rewards[:2]
             raw_rewards_list.append(raw_rewards)
             discounted_raw_rewards = raw_rewards * (config.gamma ** steps)
             discounted_raw_rewards_list.append(discounted_raw_rewards)
             if config.normalize_reward:
-                normalized_rewards = min_max_normalization(raw_rewards, config.reward_min, config.reward_max)
+                normalized_rewards = min_max_normalization(
+                    raw_rewards,
+                    getattr(config, "reward_min", 0),
+                    getattr(config, "reward_max", 1),
+                )
             else:
                 normalized_rewards = raw_rewards
             normalized_rewards_list.append(normalized_rewards)
@@ -132,14 +150,16 @@ def evaluate_policy(config, policy, env, save_dir, num_episodes=3, max_steps=500
             }, step=t_env)
         else:
             pass
-            # print(f"Avg raw returns: {avg_raw_returns}")
-            # print(f"Avg normalized returns: {avg_normalized_returns}")
-            # print(f"Avg discounted raw returns: {avg_discounted_raw_returns}")
-            # print(f"Avg discounted normalized returns: {avg_discounted_normalized_returns}")
-            # print(f"Avg steps: {avg_steps}")
-            # print(f"Avg raw NSW score: {avg_raw_nsw_score}")
-            # print(f"Avg normalized NSW score: {avg_normalized_nsw_score}")
-            # print(f"Avg discounted raw NSW score: {avg_discounted_raw_nsw_score}")
-            # print(f"Avg discounted normalized NSW score: {avg_discounted_normalized_nsw_score}")
+    
+    # Debug: print action distribution (for discrete actions)
+    if action_counts and t_env is not None:
+        total_actions = sum(action_counts.values())
+        print(f"  Action distribution at step {t_env}: ", end="")
+        for a in sorted(action_counts.keys()):
+            pct = 100 * action_counts[a] / total_actions
+            print(f"a{a}={pct:.1f}% ", end="")
+        print()
 
+    if return_episode_returns:
+        return avg_raw_returns, normalized_returns, avg_steps, raw_returns
     return avg_raw_returns, normalized_returns, avg_steps

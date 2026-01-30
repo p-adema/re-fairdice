@@ -23,7 +23,7 @@ from environments.four_rooms import aggregate_policy_heatmaps, MOFourRoomsEnv, o
 import pickle
 import numpy as np
 from collections import defaultdict
-from utils import normalization, min_max_normalization, social_welfare
+from utils import normalization, min_max_normalization, normalize_rewards, social_welfare
 from buffer import Buffer
 import argparse
 from types import SimpleNamespace
@@ -122,6 +122,8 @@ def setup_config(args, beta):
         preference_dist=args.preference_dist,
         max_seq_len=args.max_seq_len,
         normalize_reward=args.normalize_reward,
+        reward_norm=args.reward_norm,
+        ignore_fuel=args.ignore_fuel,
         env_name=args.env_name,
         total_train_steps=args.total_train_steps,
         log_interval=args.log_interval,
@@ -133,6 +135,47 @@ def setup_config(args, beta):
     )
     config.hidden_dims = [config.hidden_dim] * config.num_layers
     return config
+
+
+def compute_reward_stats(trajs):
+    """Compute reward statistics needed for normalization."""
+    reward_min, reward_max = None, None
+    reward_sum = None
+    reward_sq_sum = None
+    reward_count = 0
+    returns = []
+
+    for traj in trajs:
+        r = traj["raw_rewards"]
+        r_min, r_max = r.min(axis=0), r.max(axis=0)
+        if reward_min is None:
+            reward_min, reward_max = r_min, r_max
+        else:
+            reward_min = np.minimum(reward_min, r_min)
+            reward_max = np.maximum(reward_max, r_max)
+
+        returns.append(r.sum(axis=0))
+        reward_count += r.shape[0]
+        reward_sum = r.sum(axis=0) if reward_sum is None else reward_sum + r.sum(axis=0)
+        reward_sq_sum = (r ** 2).sum(axis=0) if reward_sq_sum is None else reward_sq_sum + (r ** 2).sum(axis=0)
+
+    reward_mean = reward_sum / max(reward_count, 1)
+    reward_var = reward_sq_sum / max(reward_count, 1) - reward_mean ** 2
+    reward_std = np.sqrt(np.maximum(reward_var, 0.0))
+
+    returns = np.array(returns) if returns else np.zeros((0, 0))
+    return_mean = returns.mean(axis=0) if returns.size else np.zeros(0)
+    reward_return_scale = 1.0 / np.maximum(return_mean, 1e-8)
+    
+    # Compute max-based scale (so max reward = 1 for each objective)
+    reward_max_scale = 1.0 / np.maximum(reward_max, 1e-8)
+    
+    # Compute balanced scale: scale so total contributions are equal
+    # Target: all objectives contribute equally to total reward
+    max_return = np.max(return_mean) if return_mean.size else 1.0
+    reward_balanced_scale = max_return / np.maximum(return_mean, 1e-8)
+
+    return reward_min, reward_max, reward_mean, reward_std, reward_return_scale, reward_max_scale, reward_balanced_scale
 
 
 def load_and_prepare_data(config):
@@ -203,7 +246,15 @@ def load_and_prepare_data(config):
         config.ACTION_SCALE = (config.ACTION_HIGH - config.ACTION_LOW) / 2.0
         config.ACTION_BIAS = (config.ACTION_HIGH + config.ACTION_LOW) / 2.0
 
-    config.reward_dim = env.obj_dim
+    # Handle ignore_fuel: slice rewards to only use ore1 and ore2
+    if config.ignore_fuel and is_minecart_env(config.env_name):
+        print("\n*** IGNORING FUEL: Using only ore1 and ore2 (2D rewards) ***\n")
+        config.reward_dim = 2
+        # Slice the rewards in the data to only keep first 2 dimensions
+        for traj in trajs:
+            traj["raw_rewards"] = traj["raw_rewards"][:, :2]
+    else:
+        config.reward_dim = env.obj_dim
 
     if config.env_name in state_norm_params:
         config.state_mean = state_norm_params[config.env_name]["mean"]
@@ -222,6 +273,7 @@ def load_and_prepare_data(config):
         config.state_mean = np.zeros(config.state_dim)
         config.state_std = np.ones(config.state_dim)
     
+    # Compute simple reward statistics
     reward_min, reward_max = None, None
     for traj in trajs:
         r = traj["raw_rewards"]
@@ -234,11 +286,54 @@ def load_and_prepare_data(config):
     config.reward_min = reward_min
     config.reward_max = reward_max
 
+    # Debug: print reward statistics
+    print(f"\n{'='*60}")
+    print("Dataset Reward Statistics:")
+    print(f"  reward_dim:           {config.reward_dim}")
+    print(f"  reward_min:           {reward_min}")
+    print(f"  reward_max:           {reward_max}")
+    print(f"  ignore_fuel:          {config.ignore_fuel}")
+    
+    # Count trajectories with ore
+    n_with_ore = sum(1 for t in trajs if t['raw_rewards'][:, 0].sum() > 0 or t['raw_rewards'][:, 1].sum() > 0)
+    print(f"  Trajectories with ore: {n_with_ore}/{len(trajs)} ({100*n_with_ore/len(trajs):.1f}%)")
+    
+    # Debug: action distribution in training data
+    all_actions = np.concatenate([t['actions'].flatten() for t in trajs])
+    action_counts = {}
+    for a in all_actions:
+        a_int = int(a)
+        action_counts[a_int] = action_counts.get(a_int, 0) + 1
+    print(f"  Action distribution in data:")
+    total = len(all_actions)
+    for a in sorted(action_counts.keys()):
+        pct = 100 * action_counts[a] / total
+        print(f"    action {a}: {action_counts[a]} ({pct:.1f}%)")
+    
+    # Check: what actions lead to ore rewards?
+    ore_actions = []
+    for t in trajs:
+        for i, r in enumerate(t['raw_rewards']):
+            if r[0] > 0 or r[1] > 0:
+                ore_actions.append(int(t['actions'][i]))
+    if ore_actions:
+        ore_action_counts = {}
+        for a in ore_actions:
+            ore_action_counts[a] = ore_action_counts.get(a, 0) + 1
+        print(f"  Actions that led to ore collection:")
+        for a in sorted(ore_action_counts.keys()):
+            pct = 100 * ore_action_counts[a] / len(ore_actions)
+            print(f"    action {a}: {ore_action_counts[a]} ({pct:.1f}%)")
+    else:
+        print(f"  WARNING: No actions led to ore collection!")
+    
+    print(f"{'='*60}\n")
+
     use_cnn = getattr(config, 'use_cnn', False)
     
     for traj in trajs:
         if config.normalize_reward:
-            traj["rewards"] = min_max_normalization(traj["raw_rewards"], reward_min, reward_max)
+            traj["rewards"] = min_max_normalization(traj["raw_rewards"], config.reward_min, config.reward_max)
         else:
             traj["rewards"] = traj["raw_rewards"]
         
@@ -350,19 +445,46 @@ def train_single_seed(config, env, batch, seed, save_dir):
         train_carry, update_info = jax.lax.scan(train_body, train_carry, length=config.log_interval)
         
         policy = get_model(train_carry[0].policy_state)[0]
-        avg_returns, _, avg_steps = evaluate_policy(
+        avg_returns, _, avg_steps, raw_returns = evaluate_policy(
             config, policy, env,
             save_dir + "/eval",
             num_episodes=config.eval_episodes,
             max_steps=config.max_seq_len,
-            t_env=step
+            t_env=step,
+            return_episode_returns=True
         )
         
         pop_welfare = social_welfare(avg_returns, config.alpha)
+        returns_array = np.array(raw_returns)
+        returns_mean = returns_array.mean(axis=0)
+        returns_std = returns_array.std(axis=0)
+        returns_min = returns_array.min(axis=0)
+        returns_max = returns_array.max(axis=0)
+
+        # Get mu values from update_info (last step of the scan)
+        mu_values = np.array(update_info["mu"][-1]) if "mu" in update_info else None
+        w_mean = float(update_info["w_mean"][-1]) if "w_mean" in update_info else 0
+        w_std = float(update_info["w_std"][-1]) if "w_std" in update_info else 0
+        policy_loss = float(update_info["policy_loss"][-1]) if "policy_loss" in update_info else 0
+        
+        print(
+            "Step {}: Returns={}  mu={}  Welfare={:.4f}  policy_loss={:.4f}  w_mean={:.4f}  w_std={:.4f}".format(
+                step,
+                returns_mean.tolist(),
+                mu_values.tolist() if mu_values is not None else "N/A",
+                float(pop_welfare),
+                policy_loss,
+                w_mean,
+                w_std,
+            )
+        )
         
         training_history.append({
             "step": step,
             "avg_returns": avg_returns.tolist(),
+            "returns_std": returns_std.tolist(),
+            "returns_min": returns_min.tolist(),
+            "returns_max": returns_max.tolist(),
             "welfare": float(pop_welfare),
             "alpha": config.alpha,
             "avg_steps": float(avg_steps),
@@ -524,6 +646,11 @@ def main():
     parser.add_argument("--preference_dist", type=str, choices=["uniform", "wide", "narrow"], default="uniform", help="Preference distribution")
     parser.add_argument("--max_seq_len", type=int, default=500, help="Max sequence length in trajectories")
     parser.add_argument("--normalize_reward", type=bool, default=False, help="Whether to normalize reward")
+    parser.add_argument("--reward_norm", type=str, default="minmax",
+                        choices=["minmax", "none"],
+                        help="Reward normalization mode (simplified)")
+    parser.add_argument("--ignore_fuel", action="store_true",
+                        help="Ignore fuel objective entirely - use only ore1 and ore2 (2D rewards)")
     parser.add_argument("--env_name", type=str, default="MO-FourRooms-v0", help="Environment name")
     parser.add_argument("--total_train_steps", type=int, default=100_000, help="Total training steps")
     parser.add_argument("--log_interval", type=int, default=1000, help="Log interval") 
@@ -613,7 +740,7 @@ def main():
         else:
             for seed in seeds:
                 seed_dir = os.path.join(experiment_dir, f"seed_{seed}")
-                model_path = os.path.join(seed_dir, "model_best")
+                model_path = os.path.abspath(os.path.join(seed_dir, "model_best"))
                 if os.path.exists(model_path):
                     best_model_paths.append(model_path)
                     

@@ -86,11 +86,77 @@ class MOMDPEnv(gym.Env):
         return self.goals
 
 
-def generate_momdp_dataset(num_trajectories=100, seed=42):
+def compute_optimal_policy(env):
+    """
+    Compute optimal policy using value iteration.
+    Uses sum of objective rewards as scalarized reward (reaching any goal gives reward 1.0).
+    
+    Returns:
+        optimal_policy: Array of shape (num_states,) with optimal action for each state
+        V: Array of shape (num_states,) with optimal value for each state
+    """
+    num_states = env.num_states
+    num_actions = env.num_actions
+    gamma = env.gamma
+    
+    # Scalarized reward: 1.0 for reaching any goal state
+    rewards = np.zeros(num_states)
+    for goal in env.goals:
+        rewards[goal] = 1.0
+    
+    # Terminal state mask (goal states are terminal)
+    terminal_mask = np.zeros(num_states)
+    for goal in env.goals:
+        terminal_mask[goal] = 1.0
+    
+    # Value iteration
+    V = np.zeros(num_states)
+    max_iters = 1000
+    tol = 1e-8
+    
+    for iteration in range(max_iters):
+        # Q(s,a) = E[R(s') + gamma * V(s') * (1 - terminal(s'))]
+        # where expectation is over s' ~ P(s'|s,a)
+        
+        # Expected immediate reward from next state
+        expected_reward = np.einsum('sak,k->sa', env.transitions, rewards)
+        
+        # Expected future value (0 for terminal next states)
+        V_non_terminal = V * (1 - terminal_mask)
+        expected_future = np.einsum('sak,k->sa', env.transitions, V_non_terminal)
+        
+        Q = expected_reward + gamma * expected_future
+        V_new = np.max(Q, axis=1)
+        
+        if np.max(np.abs(V_new - V)) < tol:
+            break
+        V = V_new
+    
+    # Extract optimal policy (greedy w.r.t. Q)
+    optimal_policy = np.argmax(Q, axis=1)
+    
+    return optimal_policy, V
+
+
+def generate_momdp_dataset(num_trajectories=100, seed=42, optimality=0.5):
+    """
+    Generate offline dataset for MO-MDP.
+    
+    Args:
+        num_trajectories: Number of trajectories to collect (default: 100)
+        seed: Random seed for environment generation
+        optimality: Behavior policy optimality level (0.0 = random, 1.0 = optimal)
+                   The behavior policy takes the optimal action with probability `optimality`
+                   and a uniformly random action with probability `1 - optimality`.
+    """
     env = MOMDPEnv(seed=seed)
+    rng = np.random.RandomState(seed + 1000)  # Separate RNG for behavior policy
+    
+    # Compute optimal policy via value iteration
+    optimal_policy, V = compute_optimal_policy(env)
     
     dataset = []
-    print(f"Generating {num_trajectories} trajectories...")
+    print(f"Generating {num_trajectories} trajectories with optimality={optimality}...")
 
     
     for _ in range(num_trajectories):
@@ -101,7 +167,11 @@ def generate_momdp_dataset(num_trajectories=100, seed=42):
         traj_terminals, traj_timeouts = [], []
         
         while not done:
-            action = env.action_space.sample()
+            # Behavior policy: with prob `optimality`, take optimal action; otherwise random
+            if rng.random() < optimality:
+                action = optimal_policy[env.current_state]
+            else:
+                action = rng.randint(env.num_actions)
             
             next_obs, reward, done, info = env.step(action)
             
@@ -127,8 +197,12 @@ def generate_momdp_dataset(num_trajectories=100, seed=42):
             'preference': np.ones((len(traj_obs), 3)) / 3.0
         })
 
-    os.makedirs("data/MO-RandomMOMDP", exist_ok=True)
-    save_path = "data/MO-RandomMOMDP/MO-RandomMOMDP_expert.pkl"
+    os.makedirs("data/MO-RandomMOMDP-v0", exist_ok=True)
+    save_path = "data/MO-RandomMOMDP-v0/MO-RandomMOMDP-v0_50000_expert_uniform.pkl"
     with open(save_path, "wb") as f:
         pickle.dump(dataset, f)
     print(f"Dataset saved to {save_path}")
+
+
+if __name__ == "__main__":
+    generate_momdp_dataset(num_trajectories=100, seed=42, optimality=0.5)

@@ -127,6 +127,47 @@ def min_max_normalization(x, min, max, eps=1e-8):
     return x
 
 
+def normalize_rewards(raw_rewards, mode="minmax", reward_min=None, reward_max=None,
+                      reward_mean=None, reward_std=None, reward_return_scale=None, 
+                      reward_max_scale=None, reward_balanced_scale=None, eps=1e-8):
+    """Normalize reward vectors using the specified mode.
+    
+    Modes:
+        - none: No normalization
+        - minmax: (x - min) / (max - min)
+        - zscore: (x - mean) / std
+        - return: x * (1 / mean_return) - scales by inverse mean trajectory return
+        - maxscale: x * (1 / max_reward) - scales so max reward = 1 for each objective
+        - balanced: x * scale where scale equalizes total objective contributions
+                   (scales so all objectives have same expected total return)
+    """
+    if mode == "none":
+        return raw_rewards
+    if mode == "minmax":
+        if reward_min is None or reward_max is None:
+            return raw_rewards
+        return min_max_normalization(raw_rewards, reward_min, reward_max, eps)
+    if mode == "zscore":
+        if reward_mean is None or reward_std is None:
+            return raw_rewards
+        return (raw_rewards - reward_mean) / (reward_std + eps)
+    if mode == "return":
+        if reward_return_scale is None:
+            return raw_rewards
+        return raw_rewards * reward_return_scale
+    if mode == "maxscale":
+        if reward_max_scale is None:
+            return raw_rewards
+        return raw_rewards * reward_max_scale
+    if mode == "balanced":
+        # Scale so all objectives have equal expected total contribution
+        # This scales ore UP to match fuel, rather than scaling fuel down
+        if reward_balanced_scale is None:
+            return raw_rewards
+        return raw_rewards * reward_balanced_scale
+    raise ValueError(f"Unknown reward normalization mode: {mode}")
+
+
 def social_welfare(returns, alpha, eps=1e-5):
     """Compute social welfare with parameter alpha (isoelastic utility).
     

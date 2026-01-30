@@ -2,7 +2,7 @@ from collections import namedtuple
 import jax
 import jax.numpy as jnp
 from flax import nnx
-from policy import GaussianPolicy, MuNetwork, DiscretePolicy, CNNDiscretePolicy, CNNGaussianPolicy
+from policy import GaussianPolicy, MuNetwork, DiscretePolicy, CNNDiscretePolicy
 from critic import Critic, CNNCritic
 from divergence import f, FDivergence, f_derivative_inverse
 import orbax.checkpoint as orbax
@@ -34,14 +34,7 @@ def init_train_state(config) -> TrainState:
                 rngs=rngs
             )
         else:
-            policy = CNNGaussianPolicy(
-                action_dim=config.action_dim,
-                feature_dim=cnn_feature_dim,
-                hidden_dims=config.hidden_dims,
-                temperature=config.temperature,
-                tanh_squash_distribution=config.tanh_squash_distribution,
-                rngs=rngs
-            )
+            raise NotImplementedError("Not supported yet")
     else:
         if config.is_discrete:
             policy = DiscretePolicy(
@@ -199,6 +192,9 @@ def train_step(config, train_state: TrainState, batch, key: jax.random.PRNGKey):
         "nu_loss": nu_loss,
         "mu": mu,
         "grad_penalty": grad_penalty,
+        "w_mean": jnp.mean(w),
+        "w_std": jnp.std(w),
+        "w_max": jnp.max(w),
     }
     
 def save_model(train_state: TrainState, path: str):

@@ -64,6 +64,88 @@ def get_valid_start_positions(env):
     H, W = layout.shape
     return [(y, x) for y in range(H) for x in range(W) if not layout[y, x]]
 
+def generate_uniform_dataset(target_trajectories=200, max_steps=50, seed=42, version="v0"):
+    env = MOFourRoomsEnv()
+    np.random.seed(seed)
+    
+    dist_maps = compute_distance_maps(env)
+    valid_starts = get_valid_start_positions(env)
+    
+    dataset = []
+    attempts = 0
+    
+    while len(dataset) < target_trajectories:
+        attempts += 1
+        start_pos = valid_starts[np.random.randint(len(valid_starts))]
+        obs = env.reset()
+        env.agent_pos = start_pos
+        obs = np.array(env.agent_pos, dtype=np.float32)
+        
+        traj_data = collections.defaultdict(list)
+        reached_goal = False
+        
+        for step in range(max_steps):
+            action = env.action_space.sample()  # Uniform random action
+            
+            next_obs, sparse_reward, done, info = env.step(action)
+            
+            curr_y, curr_x = int(obs[0]), int(obs[1])
+            dense_reward = np.zeros(3)
+            
+            for obj_i in range(3):
+                dist = dist_maps[obj_i][curr_y, curr_x]
+                if np.isinf(dist):
+                    r = 0.0
+                else:
+                    r = 1.0 / (dist + 1.0)
+                    
+                    if sparse_reward > 0 and obj_i == np.argmax(info['obj']):
+                        r += 2.0
+                
+                dense_reward[obj_i] = r
+            
+            timeout = (step >= max_steps - 1) and not done
+            terminal = done and not timeout
+            
+            traj_data['observations'].append(obs)
+            traj_data['actions'].append(action)
+            traj_data['next_observations'].append(next_obs)
+            traj_data['raw_rewards'].append(dense_reward)
+            traj_data['terminals'].append(terminal)
+            traj_data['timeouts'].append(timeout)
+            
+            obs = next_obs
+            
+            if done:
+                if sparse_reward > 0:
+                    reached_goal = True
+                break
+        
+        if reached_goal:
+            dataset.append({
+                'observations': np.array(traj_data['observations']),
+                'actions': np.array(traj_data['actions'], dtype=np.float32).reshape(-1, 1),
+                'next_observations': np.array(traj_data['next_observations']),
+                'raw_rewards': np.array(traj_data['raw_rewards']),
+                'terminals': np.array(traj_data['terminals']),
+                'timeouts': np.array(traj_data['timeouts']),
+                'preference': np.ones((len(traj_data['observations']), 3)) / 3.0
+            })
+            
+            if len(dataset) % 20 == 0:
+                print(f"Collected {len(dataset)}/{target_trajectories} trajectories ({attempts} attempts)")
+    
+    print(f"Success rate: {len(dataset)/attempts*100:.2f}%")
+    
+    save_dir = f"data/MO-FourRooms-{version}"
+    os.makedirs(save_dir, exist_ok=True)
+    save_path = os.path.join(save_dir, f"MO-FourRooms-{version}_uniform_random.pkl")
+    
+    with open(save_path, "wb") as f:
+        pickle.dump(dataset, f)
+    
+    print(f"Dataset saved to {save_path}")
+
 def generate_dense_dataset(total_trajectories=400, noise=0.05, seed=42, distribution=None, version="v0"):
     env = MOFourRoomsEnv()
     np.random.seed(seed)
@@ -197,16 +279,31 @@ def parse_args():
         help='Version string for the dataset (e.g., v0, v1, v2)'
     )
     
+    parser.add_argument(
+        '--uniform',
+        action='store_true',
+        help='Use uniform random policy instead of goal-oriented expert policy. '
+             'Generates 200 trajectories (max 50 steps each) that reach any goal.'
+    )
+    
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
     
-    generate_dense_dataset(
-        total_trajectories=args.total_trajectories,
-        noise=args.noise,
-        seed=args.seed,
-        distribution=args.distribution,
-        version=args.version
-    )
+    if args.uniform:
+        generate_uniform_dataset(
+            target_trajectories=200,
+            max_steps=50,
+            seed=args.seed,
+            version=args.version
+        )
+    else:
+        generate_dense_dataset(
+            total_trajectories=args.total_trajectories,
+            noise=args.noise,
+            seed=args.seed,
+            distribution=args.distribution,
+            version=args.version
+        )
