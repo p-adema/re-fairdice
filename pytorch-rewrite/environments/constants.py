@@ -9,8 +9,7 @@ objective_counts = {
     "MO-Walker2d-v2": 2,
 }
 
-# These are the fixed norms as given by the D4RL dataset/paper
-# They do not match the emprical mean/std of the action distributions, though.
+# These are the fixed norms as given by the MOD4RL dataset/paper
 state_norm_params = {
     "MO-Hopper-v2": {
         "mean": np.array(

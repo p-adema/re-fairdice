@@ -14,30 +14,36 @@ from utils import min_max_normalization, normalization
 
 
 def evaluate_policy(
-    config,
-    policy,
-    env,
-    save_dir,
-    num_episodes=3,
-    max_steps=500,
-    t_env=None,
+        config,
+        policy,
+        env,
+        save_dir,
+        num_episodes=3,
+        max_steps=500,
+        t_env=None,
+        discrete_deterministic: bool = True
 ):
     policy.eval()
     raw_returns = []
     normalized_returns = []
 
     @jax.jit
-    def select_action(observation):
+    def select_action(observation, rng):
         dist = policy(observation)
-        action = dist.mean()  # deterministic action
+        # deterministic action
+        if config.discrete:
+            if discrete_deterministic:
+                action = dist.mode()
+            else:
+                action = dist.sample(seed=rng)
+        else:
+            action = dist.mean()
         return action.flatten()
 
     for iter in range(num_episodes):
-        seed = config.seed * 1000 + iter
-        env.seed(seed)
+        env.seed(iter)
+        keys = jax.random.split(jax.random.key(iter), num=max_steps)
         state = env.reset()
-        if num_episodes == 1:
-            print(seed, state)
         done = False
         steps = 0
         raw_rewards_list = []
@@ -45,9 +51,9 @@ def evaluate_policy(
 
         while not done and steps < max_steps:
             s_t = normalization(state, config.state_mean, config.state_std)
-            action = (
-                select_action(s_t) * config.ACTION_SCALE + config.ACTION_BIAS
-            ).astype(np.float32)
+            action = select_action(s_t, keys[steps])
+            if not config.discrete:
+                action = (action * config.ACTION_SCALE + config.ACTION_BIAS).astype(np.float32)
             state, _, done, info = env.step(action)
 
             raw_rewards = info["obj"]
@@ -83,14 +89,17 @@ def single_re_eval(config: SimpleNamespace):
 
     env = gym.make(config.env_name)
     config.state_dim = env.observation_space.shape[0]
-    config.action_dim = env.action_space.shape[0]
     config.reward_dim = env.obj_dim
     config.state_mean = state_norm_params[config.env_name]["mean"]
     config.state_std = np.sqrt(state_norm_params[config.env_name]["var"])
-    config.ACTION_HIGH = env.action_space.high
-    config.ACTION_LOW = env.action_space.low
-    config.ACTION_SCALE = (config.ACTION_HIGH - config.ACTION_LOW) / 2.0
-    config.ACTION_BIAS = (config.ACTION_HIGH + config.ACTION_LOW) / 2.0
+    if config.discrete:
+        config.action_dim = env.action_space.n
+    else:
+        config.action_dim = env.action_space.shape[0]
+        config.ACTION_HIGH = env.action_space.high
+        config.ACTION_LOW = env.action_space.low
+        config.ACTION_SCALE = (config.ACTION_HIGH - config.ACTION_LOW) / 2.0
+        config.ACTION_BIAS = (config.ACTION_HIGH + config.ACTION_LOW) / 2.0
 
     reward_norms = {
         ("MO-Hopper-v2", "amateur"): (
@@ -141,6 +150,8 @@ def single_re_eval(config: SimpleNamespace):
             [-0.27443230152130127, -6.7318315505981445, -19.0],
             [11.846762657165527, 20.688718795776367, 4.999999046325684],
         ),
+        ("MO-GroupPolicy-v1", "amateur"): (0, 3),  # We don't really use reward norm
+        ("MO-GroupPolicy-v1", "expert"): (0, 3),
     }
 
     config.reward_min = np.asarray(reward_norms[config.env_name, config.quality][0])
@@ -160,7 +171,8 @@ def single_re_eval(config: SimpleNamespace):
     save_dir = path.parent / f"re-eval-{config.eval_episodes}"
     save_dir.mkdir(exist_ok=True)
     if (save_dir / f"raw_returns_step_{config.seed}.npy").exists():
-        print(f"Skipping {save_dir} / seed {config.seed} as it already exists.")
+        pass
+        # print(f"Skipping {save_dir} / seed {config.seed} as it already exists.")
     else:
         model = load_model(str(path.resolve()), config)
         policy = get_model(model.policy_state)[0]
@@ -173,6 +185,26 @@ def single_re_eval(config: SimpleNamespace):
             max_steps=config.max_seq_len,
             t_env=config.seed,
         )
+
+    if config.env_name == "MO-GroupPolicy-v1":
+        save_dir = path.parent / f"re-eval-{config.eval_episodes}-sample"
+        save_dir.mkdir(exist_ok=True)
+        if (save_dir / f"raw_returns_step_{config.seed}.npy").exists():
+            pass
+            # print(f"Skipping {save_dir} / seed {config.seed} as it already exists.")
+        else:
+            model = load_model(str(path.resolve()), config)
+            policy = get_model(model.policy_state)[0]
+            evaluate_policy(
+                config,
+                policy,
+                env,
+                save_dir,
+                num_episodes=config.eval_episodes,
+                max_steps=config.max_seq_len,
+                t_env=config.seed,
+                discrete_deterministic=False,
+            )
 
 
 if __name__ == "__main__":
@@ -222,7 +254,10 @@ if __name__ == "__main__":
         warnings.simplefilter("ignore", UserWarning, 1175)
         warnings.simplefilter("ignore", UserWarning, 505)
 
-        manifests = pathlib.Path.cwd().glob("*/*_FairDICE_*/model/manifest.ocdbt")
+        # base_dir = pathlib.Path.cwd()
+        base_dir = pathlib.Path.cwd().parent / "FairDICE"
+        assert base_dir.exists()
+        manifests = base_dir.glob("*/*_FairDICE_*/model/manifest.ocdbt")
         runs = [p.parent.parent for p in manifests]
         for run in tqdm.tqdm(runs, desc="Re-evaluating models..."):
             run: pathlib.Path
@@ -246,5 +281,6 @@ if __name__ == "__main__":
                 load_path=str(run / "model"),
                 eval_episodes=100,
                 seed=seed,
+                discrete=env_n in ("MO-GroupPolicy-v1",)
             )
             single_re_eval(configuration)

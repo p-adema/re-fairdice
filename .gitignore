@@ -1,6 +1,8 @@
 */data
 */results
-
+results
+*/structured-results
+test/
 
 
 # Default GitIgnore from https://github.com/github/gitignore/blob/main/Python.gitignore:

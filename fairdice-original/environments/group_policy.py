@@ -65,13 +65,10 @@ class GroupPolicyEnv(gym.Env):
             action = action.item()
         action = int(action)
 
-        # Rewards are primarily based on the policy, with some noise. Groups which were
-        # rewarded gain an advantage in how likely policies are to favour them.
         policy = self.current_options[action]
-        noise = self.rng.dirichlet(np.ones(self.num_groups, dtype=np.float32))
-        # group_rewards = policy * 0.8 + noise * 0.2
         group_rewards = policy
         indiv_rewards = group_rewards[self.memberships].sum(1)
+        # Groups which were rewarded gain an advantage in how likely policies are to favour them.
         self.current_advantage += group_rewards / 10
         self.current_options = self._generate_policies()
 
