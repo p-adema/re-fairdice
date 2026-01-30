@@ -1,0 +1,14 @@
+Group (Env/Type)                         | H-Statistic  | P-Value      | Significance   
+------------------------------------------------------------------------------------------
+Ant-v2/amateur                           | 2.7228       | 0.8427       | Not Significant
+Ant-v2/expert                            | 1.9062       | 0.9281       | Not Significant
+HalfCheetah-v2/amateur                   | 8.3690       | 0.2123       | Not Significant
+HalfCheetah-v2/expert                    | 4.4256       | 0.6193       | Not Significant
+Hopper-v2/amateur                        | 2.0578       | 0.9143       | Not Significant
+Hopper-v2/expert                         | 3.2583       | 0.7758       | Not Significant
+Hopper-v3/amateur                        | 8.0930       | 0.2314       | Not Significant
+Hopper-v3/expert                         | 5.9783       | 0.4256       | Not Significant
+Swimmer-v2/amateur                       | 2.1623       | 0.9042       | Not Significant
+Swimmer-v2/expert                        | 4.5984       | 0.5962       | Not Significant
+Walker2d-v2/amateur                      | 4.1800       | 0.6523       | Not Significant
+Walker2d-v2/expert                       | 9.1234       | 0.1668       | Not Significant
