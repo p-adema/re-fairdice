@@ -31,7 +31,7 @@ def plot_combined_figure_6():
         scores_data = json.load(f)
 
 
-    def setup_returns_plot(idx, title, dataset_type, rerun_point, fixed_point):
+    def setup_returns_plot(idx, title, dataset_type, rerun_point, fixed_point, expert):
         ax = fig.add_subplot(1, 4, idx, projection='3d')
         ax.set_title(title, fontsize=18)
         
@@ -54,13 +54,31 @@ def plot_combined_figure_6():
             _, points, _ = load_data(dataset_type, m)
             if len(points) > 0:
                 ax.scatter(points[:, 0], points[:, 1], points[:, 2], c=color, marker=marker, s=30, alpha=0.4, depthshade=False, linewidths=0)
+    
+        if expert:
+            if rerun_point is not None:
+                ax.scatter(*rerun_point, c='#d62728', marker='o', s=60, depthshade=False, edgecolors='white', linewidths=2)
+                ax.text(rerun_point[0] - 1000, rerun_point[1] - 2000, rerun_point[2] + 1900, f"({rerun_point[0]:.1f}, {rerun_point[1]:.1f}, {rerun_point[2]:.1f})", 
+                        color='#d62728', fontsize=12,
+                        bbox=dict(facecolor='white', edgecolor='#d62728', boxstyle='round,pad=0.3'))
 
+            if fixed_point is not None:
+                ax.scatter(*fixed_point, c='#9467bd', marker='o', s=60, depthshade=False, edgecolors='white', linewidths=2)
+                ax.text(rerun_point[0] + 1000, rerun_point[1], rerun_point[2] + 2050, f"({fixed_point[0]:.1f}, {fixed_point[1]:.1f}, {fixed_point[2]:.1f})", 
+                        color='#9467bd', fontsize=12,
+                        bbox=dict(facecolor='white', edgecolor='#9467bd', boxstyle='round,pad=0.3'))
+        else:
+            if rerun_point is not None:
+                ax.scatter(*rerun_point, c='#d62728', marker='o', s=60, depthshade=False, edgecolors='white', linewidths=2)
+                ax.text(rerun_point[0], rerun_point[1], rerun_point[2] + 2000, f"({rerun_point[0]:.1f}, {rerun_point[1]:.1f}, {rerun_point[2]:.1f})", 
+                        color='#d62728', fontsize=12,
+                        bbox=dict(facecolor='white', edgecolor='#d62728', boxstyle='round,pad=0.3'))
 
-        if rerun_point is not None:
-            ax.scatter(*rerun_point, c='#d62728', marker='o', s=60, depthshade=False, edgecolors='white', linewidths=2)
-
-        if fixed_point is not None:
-             ax.scatter(*fixed_point, c='#9467bd', marker='o', s=60, depthshade=False, edgecolors='white', linewidths=2)
+            if fixed_point is not None:
+                ax.scatter(*fixed_point, c='#9467bd', marker='o', s=60, depthshade=False, edgecolors='white', linewidths=2)
+                ax.text(rerun_point[0], rerun_point[1] - 2000, rerun_point[2] + 2000, f"({fixed_point[0]:.1f}, {fixed_point[1]:.1f}, {fixed_point[2]:.1f})", 
+                        color='#9467bd', fontsize=12,
+                        bbox=dict(facecolor='white', edgecolor='#9467bd', boxstyle='round,pad=0.3'))
         
 
     def setup_simplex_plot(idx, title, dataset_type, z_min, rerun_score, fixed_score):
@@ -115,11 +133,13 @@ def plot_combined_figure_6():
 
     setup_returns_plot(1, "Expert", "expert", 
                        np.array(scores_data['expert']['Hopper-v3']['Raw_Rerun']),
-                       np.array(scores_data['expert']['Hopper-v3']['Raw_Fixed']))
+                       np.array(scores_data['expert']['Hopper-v3']['Raw_Fixed']),
+                       expert=True)
     
     setup_returns_plot(2, "Amateur", "amateur", 
                        np.array(scores_data['amateur']['Hopper-v3']['Raw_Rerun']),
-                       np.array(scores_data['amateur']['Hopper-v3']['Raw_Fixed']))
+                       np.array(scores_data['amateur']['Hopper-v3']['Raw_Fixed']),
+                       expert=False)
     
     setup_simplex_plot(3, "Expert", "expert", z_min=8, 
                        rerun_score=scores_data['expert']['Hopper-v3']['Rerun'],
