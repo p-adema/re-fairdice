@@ -1,5 +1,15 @@
 # Replication study of "FairDICE: Fairness-Driven Offline Multi-Objective Reinforcement Learning"
+This directory contains the code to replicate results for FairDICE on
+D4MORL tasks, as well as on the GroupFair task (note: in code, GroupFair 
+is usually referred to as GroupPolicy instead).
 
+INTERFACE CHANGES: in `main.py`, an additional argument `--loss_kind` is added, with values
+`wrong-broadcast`, `behaviour-cloning` and `fixed-fairdice`, and a `--discrete` argument
+is added to allow for running experiments using discrete policies 
+(use `--env_name GroupPolicy-v1` to train GroupFair). `run_all.sh` is also 
+changed to generate all results necessary to replicate our graphs.
+Furthermore, a `post-eval.py` scripts is provided to re-run evaluations with more rollouts
+using model checkpoints.
 
 ## Setup
   Use the offered Dockerfile for the setup and create conda environment using yml file.
@@ -34,11 +44,10 @@ or if you want to run a single experiment
 CUDA_VISIBLE_DEVICES=0 python main.py --learner FairDICE --divergence SOFT_CHI --env_name MO-Hopper-v2 --quality expert --beta 0.1 --preference_dist uniform --eval_episodes 10 --batch_size 256 --hidden_dim 768 --num_layers 3 --total_train_steps 100000 --log_interval 1000 --normalize_reward  True
 ```
 
-MODIFICATION: an additional argument `--loss_kind` is added, with values 
-`wrong-broadcast`, `behaviour-cloning` and `fixed-fairdice`. `run_all.sh` is also changed
-to generate all results necessary to replicate our graphs.
-Furthermore, a `post-eval.py` scripts is provided to re-run evaluations with more rollouts
-using model checkpoints.
+`run_all.sh` will run all experiments needed to reproduce FairDICE baselines, and at the
+end also gathers results for GroupPolicy. Results are placed into subdirectories of
+the `structured-results` directory; to draw graphs, the BASE_DIR in boxplots.ipynb
+should be updated to point to your `structured-results` directory.
 
 ## License
 The original FairDICE code, and also this replication study, is licensed under the MIT License.
