@@ -8,7 +8,7 @@ qualities = ["expert", "amateur"]
 betas = [1, 0.1, 0.01, 0.001, 0.0001]
 seeds = [1, 2, 3, 4, 5]
 
-path = "rerun_results/old-results/"
+path = "results/"
 files = os.listdir(path)
 
 for file in files:
