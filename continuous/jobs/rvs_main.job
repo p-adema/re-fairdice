@@ -1,0 +1,46 @@
+#!/bin/bash
+
+#SBATCH --partition=gpu_mig
+#SBATCH --gpus=1
+#SBATCH --job-name=rvs_main
+#SBATCH --time=23:59:59
+#SBATCH --output=rvs_main_%A_%a.out
+#SBATCH --array=0-4
+
+# 1. Environment variables for rendering & compilers
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.mujoco/mujoco210/bin:/usr/lib/nvidia:$HOME/PEDA/.pixi/envs/default/lib
+export PATH=$HOME/.pixi/bin:$PATH
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+
+# 2. Run the experiment
+cd $HOME/PEDA
+
+# Parameters
+SEED=$SLURM_ARRAY_TASK_ID
+
+for ENV in MO-Ant-v2 MO-HalfCheetah-v2 MO-Swimmer-v2 MO-Hopper-v2 MO-Hopper-v3 MO-Walker2d-v2
+do
+    for DATASET in amateur_uniform expert_uniform
+    do
+        echo "Running experiment for $ENV - $DATASET"
+        pixi run python -u experiment.py \
+            --env $ENV \
+            --dataset $DATASET \
+            --model_type rvs \
+            --concat_state_pref 1 \
+            --concat_rtg_pref 0 \
+            --concat_act_pref 0 \
+            --mo_rtg True \
+            --num_eval_episodes 10 \
+            --seed $SEED \
+            --granularity 29 \
+            --max_iters 1 \
+            --num_steps_per_iter 100000 \
+            --batch_size 256 \
+            --log_to_wandb False \
+            --device cuda \
+            --normalize_reward True \
+            --dir "results/rvs_main"
+    done
+done

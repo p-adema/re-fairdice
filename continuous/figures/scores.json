@@ -1,0 +1,286 @@
+{
+    "amateur": {
+        "Ant-v2": {
+            "Rerun": 11.46294,
+            "Raw_Rerun": [
+                1548.9978399999998,
+                2075.22068
+            ],
+            "Fixed": 11.56898,
+            "Raw_Fixed": [
+                1945.00298,
+                1982.6550599999998
+            ],
+            "Diff": 0.10604000000000013,
+            "Rerun_Details": {
+                "strategy": "best_beta_selection",
+                "beta": "0.01",
+                "selection_score": 11.50766
+            },
+            "Fixed_Details": {
+                "beta": "0.1",
+                "grad_penalty": "0",
+                "selection_score": 11.57104
+            }
+        },
+        "HalfCheetah-v2": {
+            "Rerun": 11.93516,
+            "Raw_Rerun": [
+                1538.53804,
+                2324.2949199999994
+            ],
+            "Fixed": 12.23368,
+            "Raw_Fixed": [
+                2388.81202,
+                2078.17332
+            ],
+            "Diff": 0.2985199999999999,
+            "Rerun_Details": {
+                "strategy": "best_beta_selection",
+                "beta": "1.0",
+                "selection_score": 12.08248
+            },
+            "Fixed_Details": {
+                "beta": "0.01",
+                "grad_penalty": "0.1",
+                "selection_score": 12.23822
+            }
+        },
+        "Hopper-v2": {
+            "Rerun": 11.56814,
+            "Raw_Rerun": [
+                3219.0183,
+                4346.03256
+            ],
+            "Fixed": 11.579500000000001,
+            "Raw_Fixed": [
+                3011.7697200000002,
+                4771.5605399999995
+            ],
+            "Diff": 0.011360000000001591,
+            "Rerun_Details": {
+                "strategy": "best_beta_selection",
+                "beta": "0.1",
+                "selection_score": 11.57306
+            },
+            "Fixed_Details": {
+                "beta": "0.1",
+                "grad_penalty": "0",
+                "selection_score": 11.58928
+            }
+        },
+        "Hopper-v3": {
+            "Rerun": 17.245299999999997,
+            "Raw_Rerun": [
+                2366.89128,
+                2916.08056,
+                1974.8502
+            ],
+            "Fixed": 17.243419999999997,
+            "Raw_Fixed": [
+                2369.83484,
+                2717.66444,
+                1980.8304
+            ],
+            "Diff": -0.0018799999999998818,
+            "Rerun_Details": {
+                "strategy": "best_beta_selection",
+                "beta": "1.0",
+                "selection_score": 17.260759999999998
+            },
+            "Fixed_Details": {
+                "beta": "10.0",
+                "grad_penalty": "0.1",
+                "selection_score": 17.26922
+            }
+        },
+        "Swimmer-v2": {
+            "Rerun": 11.8208,
+            "Raw_Rerun": [
+                44.67378,
+                149.62264
+            ],
+            "Fixed": 11.820899999999998,
+            "Raw_Fixed": [
+                47.235879999999995,
+                149.4721
+            ],
+            "Diff": 9.999999999799059e-05,
+            "Rerun_Details": {
+                "strategy": "best_beta_selection",
+                "beta": "0.1",
+                "selection_score": 11.821940000000001
+            },
+            "Fixed_Details": {
+                "beta": "1e-05",
+                "grad_penalty": "0",
+                "selection_score": 11.822120000000002
+            }
+        },
+        "Walker2d-v2": {
+            "Rerun": 11.43866,
+            "Raw_Rerun": [
+                2193.54226,
+                1232.03618
+            ],
+            "Fixed": 11.3691,
+            "Raw_Fixed": [
+                1673.27686,
+                1315.38506
+            ],
+            "Diff": -0.06956000000000095,
+            "Rerun_Details": {
+                "strategy": "best_beta_selection",
+                "beta": "0.1",
+                "selection_score": 11.48344
+            },
+            "Fixed_Details": {
+                "beta": "0.1",
+                "grad_penalty": "0.0001",
+                "selection_score": 11.579939999999999
+            }
+        }
+    },
+    "expert": {
+        "Ant-v2": {
+            "Rerun": 11.52692,
+            "Raw_Rerun": [
+                2044.5509200000001,
+                1875.4839200000001
+            ],
+            "Fixed": 11.5311,
+            "Raw_Fixed": [
+                1969.45818,
+                1968.83302
+            ],
+            "Diff": 0.0041799999999998505,
+            "Rerun_Details": {
+                "strategy": "best_beta_selection",
+                "beta": "1e-05",
+                "selection_score": 11.52998
+            },
+            "Fixed_Details": {
+                "beta": "0.1",
+                "grad_penalty": "0.0001",
+                "selection_score": 11.54058
+            }
+        },
+        "HalfCheetah-v2": {
+            "Rerun": 11.84664,
+            "Raw_Rerun": [
+                1502.50434,
+                2351.96828
+            ],
+            "Fixed": 12.21926,
+            "Raw_Fixed": [
+                2370.71984,
+                2051.65766
+            ],
+            "Diff": 0.3726199999999995,
+            "Rerun_Details": {
+                "strategy": "best_beta_selection",
+                "beta": "0.001",
+                "selection_score": 11.826220000000001
+            },
+            "Fixed_Details": {
+                "beta": "0.01",
+                "grad_penalty": "0.1",
+                "selection_score": 12.21122
+            }
+        },
+        "Hopper-v2": {
+            "Rerun": 11.2544,
+            "Raw_Rerun": [
+                3312.03078,
+                4641.962799999999
+            ],
+            "Fixed": 10.950299999999999,
+            "Raw_Fixed": [
+                3291.2608800000003,
+                4328.360060000001
+            ],
+            "Diff": -0.3041000000000018,
+            "Rerun_Details": {
+                "strategy": "best_beta_selection",
+                "beta": "10.0",
+                "selection_score": 11.2811
+            },
+            "Fixed_Details": {
+                "beta": "10.0",
+                "grad_penalty": "0.1",
+                "selection_score": 11.229679999999998
+            }
+        },
+        "Hopper-v3": {
+            "Rerun": 14.88194,
+            "Raw_Rerun": [
+                1176.3862400000003,
+                1148.21854,
+                1364.57868
+            ],
+            "Fixed": 14.864439999999998,
+            "Raw_Fixed": [
+                1418.11108,
+                1445.3771399999998,
+                1393.0826000000002
+            ],
+            "Diff": -0.017500000000001847,
+            "Rerun_Details": {
+                "strategy": "best_beta_selection",
+                "beta": "1e-05",
+                "selection_score": 16.00342
+            },
+            "Fixed_Details": {
+                "beta": "10.0",
+                "grad_penalty": "0.0001",
+                "selection_score": 16.11026
+            }
+        },
+        "Swimmer-v2": {
+            "Rerun": 11.59846,
+            "Raw_Rerun": [
+                79.97997999999998,
+                140.49532000000002
+            ],
+            "Fixed": 11.66318,
+            "Raw_Fixed": [
+                151.98968,
+                133.77622000000002
+            ],
+            "Diff": 0.06472000000000122,
+            "Rerun_Details": {
+                "strategy": "best_beta_selection",
+                "beta": "0.0001",
+                "selection_score": 11.66044
+            },
+            "Fixed_Details": {
+                "beta": "0.1",
+                "grad_penalty": "0",
+                "selection_score": 11.66462
+            }
+        },
+        "Walker2d-v2": {
+            "Rerun": 11.02044,
+            "Raw_Rerun": [
+                1556.5185399999998,
+                1595.09422
+            ],
+            "Fixed": 11.17752,
+            "Raw_Fixed": [
+                1661.10302,
+                2079.0651000000003
+            ],
+            "Diff": 0.15707999999999878,
+            "Rerun_Details": {
+                "strategy": "best_beta_selection",
+                "beta": "0.1",
+                "selection_score": 11.436580000000001
+            },
+            "Fixed_Details": {
+                "beta": "1.0",
+                "grad_penalty": "0.1",
+                "selection_score": 11.540840000000001
+            }
+        }
+    }
+}
