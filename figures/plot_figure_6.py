@@ -1,11 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D
-from data_loader_6 import load_data
 import sys
 import os
-
-
 import json
 
 try:
@@ -25,6 +23,12 @@ def plot_combined_figure_6():
         ('modt', '#2ca02c', 's', 'MODT(P)'), 
         ('rvs', '#ff7f0e', '^', 'MORvS(P)')
     ]
+    
+    method_file_map = {
+        'bc': 'bc_main',
+        'modt': 'modt_main',
+        'rvs': 'rvs_main'
+    }
 
     base_path = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(base_path, 'scores.json'), 'r') as f:
@@ -51,9 +55,15 @@ def plot_combined_figure_6():
 
 
         for m, color, marker, _ in methods_config:
-            _, points, _ = load_data(dataset_type, m)
-            if len(points) > 0:
-                ax.scatter(points[:, 0], points[:, 1], points[:, 2], c=color, marker=marker, s=30, alpha=0.4, depthshade=False, linewidths=0)
+            file_name = f"{method_file_map[m]}_figure_6.csv"
+            csv_path = os.path.join(base_path, "MO-Hopper-v3", f"{dataset_type}_uniform", file_name)
+            
+            if os.path.exists(csv_path):
+                try:
+                    df = pd.read_csv(csv_path)
+                    ax.scatter(df['Ret1'], df['Ret2'], df['Ret3'], c=color, marker=marker, s=30, alpha=0.4, depthshade=False, linewidths=0)
+                except Exception as e:
+                    print(f"Error reading {csv_path}: {e}")
     
         if expert:
             if rerun_point is not None:
@@ -117,11 +127,20 @@ def plot_combined_figure_6():
 
 
         for m, color, marker, _ in methods_config:
-            weights, _, nsw_scores = load_data(dataset_type, m)
-            if len(nsw_scores) > 0:
-                px = weights[:, 1] - weights[:, 0]
-                py = 1.5 * weights[:, 2] - 0.5
-                ax.scatter(px, py, nsw_scores, c=color, marker=marker, s=30, alpha=0.5, depthshade=False, linewidths=0)
+            file_name = f"{method_file_map[m]}_figure_6.csv"
+            csv_path = os.path.join(base_path, "MO-Hopper-v3", f"{dataset_type}_uniform", file_name)
+            
+            if os.path.exists(csv_path):
+                try:
+                    df = pd.read_csv(csv_path)
+                    weights = df[['W1', 'W2', 'W3']].values
+                    nsw_scores = df['NSW'].values
+                    
+                    px = weights[:, 1] - weights[:, 0]
+                    py = 1.5 * weights[:, 2] - 0.5
+                    ax.scatter(px, py, nsw_scores, c=color, marker=marker, s=30, alpha=0.5, depthshade=False, linewidths=0)
+                except Exception as e:
+                    pass
 
 
         ax.text(v_w1[0], v_w1[1], z_min, "w1 = 1", fontsize=10, ha='right')
@@ -165,3 +184,4 @@ def plot_combined_figure_6():
 
 if __name__ == "__main__":
     plot_combined_figure_6()
+
