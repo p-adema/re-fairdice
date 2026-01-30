@@ -6,3 +6,4 @@ scripts and then visualise results using graphs/
 - [graphs](graphs) Code for plotting all the results and figures found in the report.
 - [fairdice-d4morl-groupfair](fairdice-d4morl-groupfair) JAX code for FairDICE in continuous environments, minor modifications to run experiments in replication study, and code for running the GroupFair environment.
 - [pytorch-rewrite](pytorch-rewrite) Rewrite of outdated FairDICE code using newer versions of libraries. Doesn't perfectly match results, not used in replication study. 
+- [discrete](discrete) Contains code for reproducing and extending the results on discrete datasets
