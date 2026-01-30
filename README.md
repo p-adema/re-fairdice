@@ -7,16 +7,6 @@ This repository is a copy of the original [PEDA](https://github.com/baitingzbt/P
 ### Training (Pixi)
 For training (Linux-based), we use [Pixi](https://pixi.sh/).
 
-Install Pixi:
-```bash
-curl -fsSL https://pixi.sh/install.sh | bash
-```
-
-Enter environment:
-```bash
-pixi shell
-```
-
 ### Plotting (Pip)
 For checking and reproducing figures (lighter, works on macOS/Linux), use standard pip.
 
