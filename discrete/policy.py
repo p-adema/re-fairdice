@@ -160,9 +160,9 @@ class CNNEncoder(nnx.Module):
     def __init__(self, 
                  feature_dim: int = 256,
                  rngs: nnx.Rngs = nnx.Rngs(0)):
-        # Input: (batch, 480, 480, 1)
+        # Input: (batch, 480, 480, 3)
         self.conv1 = nnx.Conv(
-            in_features=1, out_features=32,
+            in_features=3, out_features=32,
             kernel_size=(8, 8), strides=(4, 4),
             padding='VALID',
             rngs=rngs,
