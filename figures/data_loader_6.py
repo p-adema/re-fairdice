@@ -4,7 +4,7 @@ import os
 
 def load_data(dataset_type, method, subsample_size=50):
 
-    base_path = "/home/scur0076/PEDA/results"
+    base_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "results")
     
 
     configs = {

@@ -23,7 +23,7 @@ def plot_figure_4():
         "Amateur": "amateur_uniform"
     }
 
-    base_path = "/home/scur0076/PEDA/figures"
+    base_path = os.path.dirname(os.path.abspath(__file__))
     
     with open(os.path.join(base_path, 'scores.json'), 'r') as f:
         scores_data = json.load(f)

@@ -12,7 +12,7 @@ BC_FILE   = "bc_main"
 MODT_FILE = "modt_main"
 RVS_FILE  = "rvs_main"
 
-BASE_GLOB_PATTERN = "/home/scur0076/PEDA/results/{FILE_NAME}/{ENV}/{TYPE}/**/seed={seed}/logs/step=100000_rollout.pkl"
+BASE_GLOB_PATTERN = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "results", "{FILE_NAME}/{ENV}/{TYPE}/**/seed={seed}/logs/step=100000_rollout.pkl")
 
 def load_and_aggregate(file_name):
     aggregated_data = {}
@@ -112,7 +112,7 @@ def load_and_aggregate(file_name):
     print(f"\n--- Evaluation Results (Raw Returns) for {file_name} ---")
     print(df.to_string(index=False))
     
-    output_dir = os.path.join("/home/scur0076/PEDA/figures", ENV, TYPE)
+    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), ENV, TYPE)
     os.makedirs(output_dir, exist_ok=True)
     csv_path = os.path.join(output_dir, f"{file_name}_figure_5.csv")
     df.to_csv(csv_path, index=False)

@@ -26,7 +26,7 @@ def plot_combined_figure_6():
         ('rvs', '#ff7f0e', '^', 'MORvS(P)')
     ]
 
-    base_path = "/home/scur0076/PEDA/figures"
+    base_path = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(base_path, 'scores.json'), 'r') as f:
         scores_data = json.load(f)
 
@@ -159,7 +159,7 @@ def plot_combined_figure_6():
     
     fig.legend(handles=legend_elements, loc='lower center', ncol=5, bbox_to_anchor=(0.5, 0.0), fontsize=16)
 
-    output_path = "/home/scur0076/PEDA/figures/replication_figure_6.png"
+    output_path = os.path.join(base_path, "replication_figure_6.png")
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     print(f"Saved Combined Final Figure to {output_path}")
 
