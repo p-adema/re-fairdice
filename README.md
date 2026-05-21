@@ -1,10 +1,10 @@
-# \[Re] FairDICE: A Gap Between Theory And Practice
+# \[Re] FairDICE: A Fair Tradeoff in Multi-objective Offline RL
 
-This repository contains code for running experiments and plotting graphs for our replication study "[\[Re\] FairDICE: A Gap Between Theory And Practice](https://arxiv.org/abs/2603.03454)", which aims to replicate the paper "[FairDICE: Fairness-Driven Offline Multi-Objective Reinforcement Learning](https://arxiv.org/abs/2506.08062v2)" by Kim et al.
+This repository contains code for running experiments and plotting graphs for our TMLR replication study "[\[Re\] FairDICE: A Fair Tradeoff in Multi-objective Offline RL](https://openreview.net/forum?id=Tr6MBt0hAj)", which aims to replicate the NeurIPS 2025 paper "[FairDICE: Fairness-Driven Offline Multi-Objective Reinforcement Learning](https://neurips.cc/virtual/2025/loc/san-diego/poster/120111)" by Kim et al.
 
 As part of our replication effort, we discovered a critical bug in the original code and clarified certain parts of the original experiments, after which we were able to recreate some of the results from the original paper and verify the validity of the theory behind FairDICE. We also performed additional experiments using more complex enviornments and edge cases to test the generalisability of the algorithm.
 
-The original code is available at: [ku-dmlab/FairDICE](https://github.com/ku-dmlab/FairDICE/tree/main) (note that we based our code on revision [bf610ab](https://github.com/ku-dmlab/FairDICE/tree/bf610ab4839177b9c8eb82f158cf3911b31a6f74))
+The original code is available at: [ku-dmlab/FairDICE](https://github.com/ku-dmlab/FairDICE/tree/main) (note that we based our analysis on revision [bf610ab](https://github.com/ku-dmlab/FairDICE/tree/bf610ab4839177b9c8eb82f158cf3911b31a6f74), as of date this is till the latest revision)
 
 To run experiments, please refer to the README.md files in the corresponding subdirectories. 
 
@@ -18,16 +18,17 @@ To run experiments, please refer to the README.md files in the corresponding sub
 
 # Citing
 
-If you found our work useful, please cite the following (preprint):
+If you found our work useful, please cite the following:
 
 ```
-@misc{adema2026refairdicegaptheory,
-      title={[Re] FairDICE: A Gap Between Theory And Practice}, 
-      author={Peter Adema and Karim Galliamov and Aleksey Evstratovskiy and Ross Geurts},
-      year={2026},
-      eprint={2603.03454},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2603.03454}, 
+@article{
+adema2026re,
+title={[Re] Fair{DICE}: A Fair Tradeoff in Multi-objective Offline {RL}},
+author={Peter Adema and Karim Galliamov and Aleksey Evstratovskiy and Ross Geurts},
+journal={Transactions on Machine Learning Research},
+issn={2835-8856},
+year={2026},
+url={https://openreview.net/forum?id=Tr6MBt0hAj},
+note={Reproducibility Certification}
 }
 ```
